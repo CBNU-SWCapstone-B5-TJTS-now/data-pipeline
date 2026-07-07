@@ -63,9 +63,11 @@ with tab_a:
         # threshold_summary: 다중 시드(10회) 평균/표준편차 집계 (threshold, mean_corr, std_corr)
         df_a = pd.read_sql("SELECT * FROM threshold_summary ORDER BY threshold", engine)
 
-        col1, col2 = st.columns([2, 1])
+        # 큰 모니터(3K 이상)에서 차트가 과도하게 늘어나 보이지 않도록
+        # figsize로 원본 해상도를 키우고, use_container_width=False로 고정 크기 렌더링
+        col1, col2 = st.columns([3, 2])
         with col1:
-            fig, ax = plt.subplots(figsize=(7, 4))
+            fig, ax = plt.subplots(figsize=(10, 6))
             ax.plot(df_a["threshold"], df_a["mean_corr"], marker="o", color="#DD6B20", linewidth=2)
             ax.fill_between(
                 df_a["threshold"],
@@ -80,7 +82,7 @@ with tab_a:
             ax.set_ylabel("Trust Score - 실제정확도 평균 상관계수")
             ax.legend()
             ax.grid(alpha=0.3)
-            st.pyplot(fig)
+            st.pyplot(fig, use_container_width=False)
         with col2:
             st.metric("가장 높은 평균 상관계수", f"{df_a['mean_corr'].max():.3f}",
                        f"임계값 = {int(best_th)}")
