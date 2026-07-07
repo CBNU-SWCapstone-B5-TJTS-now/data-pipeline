@@ -1,70 +1,161 @@
 """
-2단계 (트랙 A): 여러 반대 임계값으로 Trust Score를 계산해보고,
-각 임계값에서 trust_score가 실제 정확도(true_accuracy)를 얼마나 잘 반영하는지 비교한다.
+트랙 A: Trust Score 반대(disagree) 임계값 1~10에 대해,
+사용자의 (숨겨진) true_accuracy와 최종 trust_score의 상관관계를 검증해
+어떤 임계값이 실제 정확도를 가장 잘 반영하는지 확인한다.
 
-핵심 질문: "반대가 몇 개 이상일 때 감점해야, trust_score가 실제로 신뢰할 만한 유저를 잘 구별하는가?"
+다중 시드(10회) 반복: 매번 유저/제보/투표를 새로 시뮬레이션해서
+특정 난수 draw에 의한 우연이 아니라 임계값 선택의 효과가 안정적인지 검증.
+
+결과는 threshold_results 테이블(seed, threshold, pearson_corr, n_users)에 저장.
+
+최종 설계 반영: Trust Score 기본값 50, 범위 0~100 클리핑,
+반대 임계값 T까지 무사·초과분마다 -1, 동의 1개당 +1.
+(generate_simulation_data.py와 동일한 시뮬레이션 로직 — 유저/제보/투표 생성 규칙만 재사용,
+ 여기서는 DB의 sim_* 테이블과 무관하게 독립적으로 반복 시뮬레이션한다.)
 """
-import pandas as pd
+import os
+
 import numpy as np
-from scipy.stats import pearsonr
+import pandas as pd
+from sqlalchemy import create_engine, text
 
-users = pd.read_csv("/home/claude/sim_users.csv")
-votes = pd.read_csv("/home/claude/sim_votes.csv")
+DB_USER = "crowd_app"
+DB_PASSWORD = os.environ.get("CROWD_APP_PW", "")
+DB_HOST = "localhost"
+DB_PORT = 5432
+DB_NAME = "crowd_pipeline"
+
+N_USERS = 200
+N_REPORTS = 800
+THRESHOLDS = range(1, 11)
+SEEDS = range(1, 11)  # 다중 시드 10회
 
 
-def calc_trust_score(disagree_threshold, agree_increment=1, disagree_penalty=1, base_score=50):
-    """
-    현재 백로그 정책을 임계값만 바꿔서 재현:
-    - 기본 점수 base_score
-    - 제보 하나당 '동의' 수만큼 +agree_increment
-    - 제보 하나당 '반대' 수가 disagree_threshold 이상이면 -disagree_penalty
-    """
+def simulate_one_seed(seed: int):
+    rng = np.random.default_rng(seed)
+
+    users = pd.DataFrame({
+        "user_id": range(1, N_USERS + 1),
+        "true_accuracy": np.concatenate([
+            rng.beta(8, 2, int(N_USERS * 0.85)),
+            rng.beta(2, 5, int(N_USERS * 0.15)),
+        ]),
+    })
+    users["true_accuracy"] = users["true_accuracy"].clip(0.05, 0.98)
+
+    locations_ids = [1, 2, 3, 4]
+    reports = pd.DataFrame({
+        "report_id": range(1, N_REPORTS + 1),
+        "reporter_id": rng.choice(users["user_id"], N_REPORTS),
+        "location_id": rng.choice(locations_ids, N_REPORTS),
+        "hour": rng.choice(range(8, 22), N_REPORTS),
+    })
+
+    def true_congestion(hour, location_id):
+        base = 2.0
+        if 12 <= hour <= 13:
+            base += 2.0
+        if 18 <= hour <= 19:
+            base += 1.0
+        if location_id == 1:
+            base += 0.5
+        return float(np.clip(base + rng.normal(0, 0.4), 1, 5))
+
+    reports["true_congestion"] = reports.apply(
+        lambda r: true_congestion(r["hour"], r["location_id"]), axis=1
+    )
+    reports = reports.merge(users[["user_id", "true_accuracy"]], left_on="reporter_id", right_on="user_id")
+    reports["reported_congestion"] = reports.apply(
+        lambda r: round(np.clip(r["true_congestion"] + rng.normal(0, (1 - r["true_accuracy"]) * 3), 1, 5)),
+        axis=1,
+    )
+    reports = reports.drop(columns=["user_id"])
+
+    votes_list = []
+    vote_id = 1
+    for _, rep in reports.iterrows():
+        n_voters = rng.integers(3, 10)
+        voters = rng.choice(users["user_id"], n_voters, replace=False)
+        for voter_id in voters:
+            voter_acc = users.loc[users["user_id"] == voter_id, "true_accuracy"].values[0]
+            is_report_accurate = abs(rep["reported_congestion"] - rep["true_congestion"]) <= 1
+            agree_prob = voter_acc if is_report_accurate else (1 - voter_acc)
+            vote_type = "agree" if rng.random() < agree_prob else "disagree"
+            votes_list.append({
+                "vote_id": vote_id, "report_id": rep["report_id"],
+                "voter_id": voter_id, "vote_type": vote_type,
+            })
+            vote_id += 1
+    votes = pd.DataFrame(votes_list)
+
+    return users, reports, votes
+
+
+def calc_trust_scores(users, reports, votes, disagree_threshold, agree_increment=1, base_score=50, floor=0, ceiling=100):
     scores = {uid: base_score for uid in users["user_id"]}
-
-    # 유저별로 자신이 올린 제보들에 대한 투표 결과를 집계해야 하므로,
-    # report_id 기준으로 reporter_id를 다시 붙인다.
-    reports = pd.read_csv("/home/claude/sim_reports.csv")[["report_id", "reporter_id"]]
-    v = votes.merge(reports, on="report_id")
-
-    # 제보(report_id)별로 동의/반대 수 집계
-    vote_counts = v.groupby(["report_id", "reporter_id", "vote_type"]).size().unstack(fill_value=0)
+    vote_counts = votes.merge(reports[["report_id", "reporter_id"]], on="report_id") \
+        .groupby(["report_id", "reporter_id", "vote_type"]).size().unstack(fill_value=0)
     if "agree" not in vote_counts.columns:
         vote_counts["agree"] = 0
     if "disagree" not in vote_counts.columns:
         vote_counts["disagree"] = 0
-
     for (report_id, reporter_id), row in vote_counts.iterrows():
         scores[reporter_id] += row["agree"] * agree_increment
-        if row["disagree"] >= disagree_threshold:
-            scores[reporter_id] -= disagree_penalty
+        excess = max(0, row["disagree"] - disagree_threshold)
+        scores[reporter_id] -= excess
+    for uid in scores:
+        scores[uid] = max(floor, min(ceiling, scores[uid]))
+    return scores
 
-    return pd.Series(scores, name="trust_score")
+
+def main():
+    results = []
+    for seed in SEEDS:
+        users, reports, votes = simulate_one_seed(seed)
+        for threshold in THRESHOLDS:
+            scores = calc_trust_scores(users, reports, votes, threshold)
+            trust = users["user_id"].map(scores)
+            corr = float(np.corrcoef(trust, users["true_accuracy"])[0, 1])
+            results.append({
+                "seed": seed, "threshold": threshold,
+                "pearson_corr": corr, "n_users": N_USERS,
+            })
+            print(f"seed={seed:2d} threshold={threshold:2d}  pearson_corr={corr:+.4f}")
+
+    results_df = pd.DataFrame(results)
+
+    engine = create_engine(f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}")
+    results_df.to_sql("threshold_results", engine, if_exists="replace", index=False)
+
+    summary = results_df.groupby("threshold")["pearson_corr"].agg(["mean", "std"]).reset_index()
+    summary = summary.sort_values("mean", ascending=False)
+    best = summary.iloc[0]
+
+    print("\n=== 임계값별 평균 상관계수 (10개 시드) ===")
+    print(summary.to_string(index=False))
+    print(f"\n최적 임계값: {int(best['threshold'])} (평균 pearson_corr={best['mean']:.4f}, std={best['std']:.4f})")
+
+    with engine.connect() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS threshold_summary (
+                threshold INTEGER PRIMARY KEY,
+                mean_corr DOUBLE PRECISION,
+                std_corr DOUBLE PRECISION
+            );
+        """))
+        conn.execute(text("TRUNCATE threshold_summary;"))
+        for _, row in summary.iterrows():
+            conn.execute(text("""
+                INSERT INTO threshold_summary (threshold, mean_corr, std_corr)
+                VALUES (:threshold, :mean_corr, :std_corr);
+            """), {
+                "threshold": int(row["threshold"]),
+                "mean_corr": float(row["mean"]),
+                "std_corr": float(row["std"]),
+            })
+        conn.commit()
+    print("threshold_results, threshold_summary 테이블 저장 완료")
 
 
-# ---- 여러 임계값으로 반복 실험 ----
-thresholds_to_test = [1, 2, 3, 4, 5, 7, 10]
-results = []
-
-for th in thresholds_to_test:
-    trust = calc_trust_score(disagree_threshold=th)
-    merged = users.set_index("user_id").drop(columns=["trust_score"]).join(trust)
-    corr, pval = pearsonr(merged["true_accuracy"], merged["trust_score"])
-    results.append({
-        "disagree_threshold": th,
-        "correlation_with_true_accuracy": round(corr, 4),
-        "p_value": round(pval, 4),
-        "trust_score_mean": round(merged["trust_score"].mean(), 1),
-        "trust_score_std": round(merged["trust_score"].std(), 1),
-    })
-
-result_df = pd.DataFrame(results)
-print("=== 임계값별 Trust Score vs 실제 정확도 상관관계 ===")
-print(result_df.to_string(index=False))
-print()
-
-best = result_df.loc[result_df["correlation_with_true_accuracy"].idxmax()]
-print(f"가장 상관관계가 높은 임계값: 반대 {int(best['disagree_threshold'])}개 "
-      f"(상관계수 {best['correlation_with_true_accuracy']})")
-print(f"→ (참고) 현재 백로그 정책값: 반대 3개")
-
-result_df.to_csv("/home/claude/track_a_results.csv", index=False)
+if __name__ == "__main__":
+    main()
