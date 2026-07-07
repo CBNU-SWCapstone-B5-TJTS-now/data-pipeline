@@ -36,7 +36,9 @@ Nowhere는 Geofence로 현장 인증된 유저들의 동의/반대 투표를 바
 - Object Storage (원본 데이터 및 리포트 백업)
 - VCN / Security List (PostgreSQL 5432, Streamlit 서비스 포트 인바운드 허용)
 
-전체 워크플로우 다이어그램: [`docs/workflow_diagram.png`](docs/workflow_diagram.png) *(작성 예정)*
+전체 워크플로우 다이어그램:
+
+![워크플로우 다이어그램](docs/workflow_diagram.png)
 
 ## 3. 설치 및 실행 방법
 
@@ -119,17 +121,18 @@ streamlit run app/dashboard.py --server.port 8501
 data-pipeline/
 ├── README.md
 ├── scripts/
-│   ├── setup_postgis.md          # PostgreSQL+PostGIS 설치 가이드
-│   ├── schema.sql                 # DB 스키마
+│   ├── setup_postgis.md              # PostgreSQL+PostGIS 설치 가이드
+│   ├── schema.sql                     # DB 스키마
 │   ├── generate_simulation_data.py
-│   └── fetch_weather.py           # 기상청 공공데이터 API 연동
+│   ├── fetch_weather.py               # 기상청 공공데이터 API 연동
+│   └── upload_to_object_storage.py    # Object Storage 백업
 ├── analysis/
-│   ├── track_a_threshold.py       # 트랙 A: 임계값 분석
-│   └── track_b_spatiotemporal.py  # 트랙 B: 시공간 패턴 분석
+│   ├── track_a_threshold.py           # 트랙 A: 임계값 분석
+│   └── track_b_spatiotemporal.py      # 트랙 B: 시공간 패턴 분석
 ├── app/
-│   └── dashboard.py                # Streamlit 대시보드
+│   └── dashboard.py                    # Streamlit 대시보드
 └── docs/
-    └── workflow_diagram.png        # 전체 워크플로우 다이어그램
+    └── workflow_diagram.png            # 전체 워크플로우 다이어그램
 ```
 
 ## 관련 저장소
