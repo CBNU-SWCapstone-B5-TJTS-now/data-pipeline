@@ -15,6 +15,10 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 import matplotlib.pyplot as plt
 
+# 한글 깨짐 방지 (서버에 google-noto-sans-cjk-ttc-fonts 설치 필요)
+plt.rcParams["font.family"] = "Noto Sans CJK KR"
+plt.rcParams["axes.unicode_minus"] = False
+
 st.set_page_config(page_title="Nowhere Data Pipeline", layout="wide")
 
 # ---- DB 연결 ----

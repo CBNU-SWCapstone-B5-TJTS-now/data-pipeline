@@ -47,6 +47,7 @@ Nowhere는 Geofence로 현장 인증된 유저들의 동의/반대 투표를 바
 - conda 환경 (Python 3.11)
 - PostgreSQL 16 + PostGIS 3.3
 - 공공데이터포털(data.go.kr) 기상청 API 인증키
+- 한글 폰트 (`sudo dnf install -y google-noto-sans-cjk-ttc-fonts`) — matplotlib 차트(트랙 A/B)의 한글 라벨 깨짐 방지
 
 ### 설치
 
