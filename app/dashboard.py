@@ -5,7 +5,7 @@ Nowhere Data Pipeline - Streamlit 대시보드
 실행: streamlit run app/dashboard.py --server.port 8501
 
 주의: 아래 쿼리들은 트랙 A/B 분석 스크립트(analysis/track_a_threshold.py,
-analysis/track_b_spatiotemporal.py)가 결과 테이블(threshold_results,
+analysis/track_b_spatiotemporal.py)가 결과 테이블(threshold_results/threshold_summary,
 congestion_hourly_summary)을 만들어 둔 뒤에 정상 동작합니다.
 아직 결과 테이블이 없다면 해당 탭에 안내 메시지가 표시됩니다.
 """
@@ -55,25 +55,39 @@ with tab_a:
         "**Trust Score와 실제 정확도(true_accuracy)의 상관관계**를 비교합니다."
     )
 
-    if table_exists(engine, "threshold_results"):
-        df_a = pd.read_sql("SELECT * FROM threshold_results ORDER BY threshold", engine)
+    if table_exists(engine, "threshold_summary"):
+        # threshold_summary: 다중 시드(10회) 평균/표준편차 집계 (threshold, mean_corr, std_corr)
+        df_a = pd.read_sql("SELECT * FROM threshold_summary ORDER BY threshold", engine)
 
         col1, col2 = st.columns([2, 1])
         with col1:
             fig, ax = plt.subplots(figsize=(7, 4))
-            ax.plot(df_a["threshold"], df_a["correlation"], marker="o", color="#DD6B20", linewidth=2)
+            ax.plot(df_a["threshold"], df_a["mean_corr"], marker="o", color="#DD6B20", linewidth=2)
+            ax.fill_between(
+                df_a["threshold"],
+                df_a["mean_corr"] - df_a["std_corr"],
+                df_a["mean_corr"] + df_a["std_corr"],
+                color="#DD6B20", alpha=0.15, label="±1 표준편차 (10개 시드)",
+            )
             ax.axvline(x=3, color="#718096", linestyle="--", alpha=0.7, label="현재 정책값 (3)")
-            best_th = df_a.loc[df_a["correlation"].idxmax(), "threshold"]
+            best_th = df_a.loc[df_a["mean_corr"].idxmax(), "threshold"]
             ax.axvline(x=best_th, color="#38A169", linestyle="--", alpha=0.7, label=f"최적값 ({int(best_th)})")
             ax.set_xlabel("반대(disagree) 임계값")
-            ax.set_ylabel("Trust Score - 실제정확도 상관계수")
+            ax.set_ylabel("Trust Score - 실제정확도 평균 상관계수")
             ax.legend()
             ax.grid(alpha=0.3)
             st.pyplot(fig)
         with col2:
-            st.metric("가장 높은 상관계수", f"{df_a['correlation'].max():.3f}",
+            st.metric("가장 높은 평균 상관계수", f"{df_a['mean_corr'].max():.3f}",
                        f"임계값 = {int(best_th)}")
             st.dataframe(df_a, use_container_width=True, hide_index=True)
+
+        with st.expander("시드별 원본 결과 (threshold_results)"):
+            if table_exists(engine, "threshold_results"):
+                df_raw = pd.read_sql(
+                    "SELECT * FROM threshold_results ORDER BY threshold, seed", engine
+                )
+                st.dataframe(df_raw, use_container_width=True, hide_index=True)
 
         st.info(
             "⚠️ 이 결과는 합성(시뮬레이션) 데이터 기준입니다. "
@@ -81,7 +95,7 @@ with tab_a:
         )
     else:
         st.warning(
-            "threshold_results 테이블이 아직 없습니다. "
+            "threshold_summary 테이블이 아직 없습니다. "
             "analysis/track_a_threshold.py 를 먼저 실행해주세요."
         )
 
@@ -95,7 +109,8 @@ with tab_b:
     if table_exists(engine, "congestion_hourly_summary"):
         df_b = pd.read_sql("SELECT * FROM congestion_hourly_summary", engine)
 
-        pivot = df_b.pivot_table(index="location_name", columns="hour", values="avg_congestion")
+        # 히트맵은 장소x시간대 기준 — 요일(day_of_week)은 평균으로 눌러서 표시
+        pivot = df_b.pivot_table(index="location_name", columns="hour", values="avg_reported_congestion", aggfunc="mean")
         fig2, ax2 = plt.subplots(figsize=(10, 4))
         im = ax2.imshow(pivot.values, cmap="YlOrRd", aspect="auto")
         ax2.set_xticks(range(len(pivot.columns)))
@@ -103,7 +118,7 @@ with tab_b:
         ax2.set_yticks(range(len(pivot.index)))
         ax2.set_yticklabels(pivot.index)
         ax2.set_xlabel("시간대")
-        plt.colorbar(im, ax=ax2, label="평균 혼잡도")
+        plt.colorbar(im, ax=ax2, label="평균 혼잡도 (제보 기준)")
         st.pyplot(fig2)
 
         st.subheader("장소별 지도")
@@ -114,7 +129,7 @@ with tab_b:
             locations = pd.read_sql("SELECT name, latitude, longitude, category FROM sim_locations", engine)
             m = folium.Map(location=[locations["latitude"].mean(), locations["longitude"].mean()], zoom_start=16)
             for _, loc in locations.iterrows():
-                avg_c = df_b[df_b["location_name"] == loc["name"]]["avg_congestion"].mean()
+                avg_c = df_b[df_b["location_name"] == loc["name"]]["avg_reported_congestion"].mean()
                 color = "red" if avg_c >= 3.5 else ("orange" if avg_c >= 2.5 else "green")
                 folium.CircleMarker(
                     location=[loc["latitude"], loc["longitude"]],
@@ -127,7 +142,14 @@ with tab_b:
 
         if table_exists(engine, "weather_observations"):
             st.subheader("날씨 관측 데이터 (기상청 공공데이터)")
-            df_w = pd.read_sql("SELECT * FROM weather_observations ORDER BY observed_at DESC LIMIT 24", engine)
+            st.caption(
+                "long-format 저장 — 관측 시각(base_date/base_time)마다 항목(category)별로 한 행씩 저장됨"
+            )
+            df_w = pd.read_sql(
+                "SELECT base_date, base_time, category_name, obs_value, fetched_at "
+                "FROM weather_observations ORDER BY fetched_at DESC LIMIT 40",
+                engine,
+            )
             st.dataframe(df_w, use_container_width=True, hide_index=True)
     else:
         st.warning(
