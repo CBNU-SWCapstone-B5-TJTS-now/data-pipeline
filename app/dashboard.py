@@ -115,7 +115,7 @@ with tab_b:
 
         # 히트맵은 장소x시간대 기준 — 요일(day_of_week)은 평균으로 눌러서 표시
         pivot = df_b.pivot_table(index="location_name", columns="hour", values="avg_reported_congestion", aggfunc="mean")
-        fig2, ax2 = plt.subplots(figsize=(10, 4))
+        fig2, ax2 = plt.subplots(figsize=(14, 5))
         im = ax2.imshow(pivot.values, cmap="YlOrRd", aspect="auto")
         ax2.set_xticks(range(len(pivot.columns)))
         ax2.set_xticklabels(pivot.columns)
@@ -123,7 +123,11 @@ with tab_b:
         ax2.set_yticklabels(pivot.index)
         ax2.set_xlabel("시간대")
         plt.colorbar(im, ax=ax2, label="평균 혼잡도 (제보 기준)")
-        st.pyplot(fig2)
+
+        # 큰 모니터(3K 이상)에서 과도하게 늘어나 보이지 않도록 폭을 80%로 제한
+        col_l, col_mid, col_r = st.columns([1, 8, 1])
+        with col_mid:
+            st.pyplot(fig2, use_container_width=False)
 
         st.subheader("장소별 지도")
         try:
