@@ -232,12 +232,12 @@ def style_axes(ax):
 st.markdown('<div class="eyebrow">NOWHERE DATA PIPELINE</div>', unsafe_allow_html=True)
 st.markdown('<div class="page-title">Trust Score, 어떤 기준이 가장 정확할까요?</div>', unsafe_allow_html=True)
 st.markdown(
-    '<div class="page-subtitle">Geofencing 기반 혼잡도 제보 시스템 — 시뮬레이션 데이터로 검증한 '
-    'Peer Review 임계값 분석과 시공간 혼잡도 패턴</div>',
+    '<div class="page-subtitle">Geofencing 기반 혼잡도 제보 시스템의 Peer Review 임계값을 '
+    '시뮬레이션 데이터로 검증하고, 시공간 혼잡도 패턴까지 함께 살펴봐요</div>',
     unsafe_allow_html=True,
 )
 
-tab_a, tab_b, tab_about = st.tabs(["📊 Trust Score 임계값", "🕐 혼잡도 패턴", "📁 프로젝트 개요"])
+tab_a, tab_b, tab_about = st.tabs(["Trust Score 임계값", "혼잡도 패턴", "프로젝트 개요"])
 
 # =========================================================
 # 트랙 A
@@ -254,10 +254,10 @@ with tab_a:
         improve_pct = ((best_corr - policy_corr) / policy_corr * 100) if policy_corr else None
 
         hero_desc = (
-            f"현재 정책(반대 3개)보다 상관계수가 {improve_pct:.0f}% 더 높습니다 · "
-            f"10회 반복 시뮬레이션에서 매번 1위"
+            f"현재 정책(반대 3개)보다 상관계수가 {improve_pct:.0f}% 더 높아요 · "
+            f"10회 반복 시뮬레이션에서 매번 1등이에요"
             if improve_pct is not None
-            else "10회 반복 시뮬레이션 기준 가장 안정적으로 높은 상관계수를 기록했습니다."
+            else "10회 반복 시뮬레이션 기준 가장 안정적으로 높은 상관계수를 기록했어요."
         )
         hero_card_number("가장 신뢰도 높은 반대 임계값", str(best_th), "개", hero_desc)
 
@@ -289,10 +289,10 @@ with tab_a:
 
         section_card_with_image(
             "이게 왜 중요한가요?",
-            "제보에 반대가 몇 개 이상 모이면 신뢰도를 깎아야 할까요? 지금은 \"3개\"로 정해져 있지만, "
-            "시뮬레이션으로 여러 값을 실험해보니 <b>더 엄격한 기준</b>일 때 실제로 정확한 사람과 "
-            "부정확한 사람을 더 잘 구별해냈습니다. 아래 그래프는 임계값을 1~10까지 바꿔가며 "
-            "10번씩 반복 시뮬레이션한 평균 결과입니다.",
+            "제보에 반대가 몇 개 이상 모이면 신뢰도를 깎아야 할까요? 지금은 \"3개\"로 정해져 있는데, "
+            "시뮬레이션으로 여러 값을 실험해봤더니 <b>더 엄격한 기준</b>일 때 정확한 사람과 "
+            "부정확한 사람을 더 잘 구별해냈어요. 아래 그래프는 임계값을 1~10까지 바꿔가며 "
+            "10번씩 반복 시뮬레이션한 평균 결과예요.",
             fig,
         )
         plt.close(fig)
@@ -307,8 +307,8 @@ with tab_a:
                 st.dataframe(df_raw, use_container_width=True, hide_index=True)
 
         st.info(
-            "⚠️ 이 결과는 합성(시뮬레이션) 데이터 기준입니다. "
-            "서비스 런칭 후 실데이터로 재조정(recalibration)이 필요합니다."
+            "⚠️ 이 결과는 합성(시뮬레이션) 데이터를 기준으로 해요. "
+            "서비스 런칭 후에는 실데이터로 다시 검증(재조정)할 예정이에요."
         )
     else:
         st.warning(
@@ -329,7 +329,7 @@ with tab_b:
         hero_card_number(
             "가장 혼잡한 시간대의 평균 혼잡도",
             f"{busiest['avg_reported_congestion']:.1f}", f"/ 5.0 · {busiest['location_name']} {int(busiest['hour'])}시",
-            "점심(12-13시)·저녁(18-19시) 피크가 전체 장소에서 공통적으로 관찰됩니다.",
+            "점심(12-13시)과 저녁(18-19시)에 전체 장소에서 공통적으로 붐볐어요.",
         )
 
         col1, col2 = st.columns(2)
@@ -347,8 +347,7 @@ with tab_b:
                                   values="avg_reported_congestion", aggfunc="mean")
         fig2, ax2 = plt.subplots(figsize=(11, 4.0))
         fig2.patch.set_facecolor(P["card"])
-        cmap = "YlOrRd" if not st.session_state.dark_mode else "inferno"
-        im = ax2.imshow(pivot.values, cmap=cmap, aspect="auto")
+        im = ax2.imshow(pivot.values, cmap="YlOrRd", aspect="auto")
         ax2.set_xticks(range(len(pivot.columns)))
         ax2.set_xticklabels(pivot.columns, color=P["text3"])
         ax2.set_yticks(range(len(pivot.index)))
@@ -364,8 +363,8 @@ with tab_b:
 
         section_card_with_image(
             "언제 어디가 가장 붐빌까요?",
-            "장소별로 100m(학식·도서관) 또는 80m(카페) geofence 반경 내 제보만 걸러내어, "
-            "시간대별 평균 혼잡도를 집계했습니다. 색이 진할수록 혼잡한 시간대입니다.",
+            "장소별로 100m(학식·도서관) 또는 80m(카페) geofence 반경 안의 제보만 걸러내서, "
+            "시간대별 평균 혼잡도를 모아봤어요. 색이 진할수록 혼잡한 시간대예요.",
             fig2,
             badge="트랙 B",
         )
@@ -373,16 +372,15 @@ with tab_b:
 
         section_text_card(
             "장소별 지도",
-            "실제 캠퍼스 좌표 위에 장소를 표시했습니다. 마커를 클릭하면 평균 혼잡도를 확인할 수 있습니다.",
+            "실제 캠퍼스 좌표 위에 장소를 표시했어요. 마커를 클릭하면 평균 혼잡도를 볼 수 있어요.",
         )
         try:
             import folium
             from streamlit_folium import st_folium
 
             locations = pd.read_sql("SELECT name, latitude, longitude, category FROM sim_locations", engine)
-            tiles = "CartoDB dark_matter" if st.session_state.dark_mode else "OpenStreetMap"
             m = folium.Map(location=[locations["latitude"].mean(), locations["longitude"].mean()],
-                            zoom_start=16, tiles=tiles)
+                            zoom_start=16)
             for _, loc in locations.iterrows():
                 avg_c = df_b[df_b["location_name"] == loc["name"]]["avg_reported_congestion"].mean()
                 color = "red" if avg_c >= 3.5 else ("orange" if avg_c >= 2.5 else "green")
@@ -400,8 +398,8 @@ with tab_b:
         if table_exists(engine, "weather_observations"):
             section_text_card(
                 "날씨 관측 데이터",
-                "기상청 공공데이터포털(초단기실황)에서 매시간 자동으로 수집한 관측값입니다. "
-                "혼잡도와의 상관관계는 데이터가 더 쌓이면 함께 분석할 예정입니다.",
+                "기상청 공공데이터포털(초단기실황)에서 매시간 자동으로 모으고 있는 관측값이에요. "
+                "혼잡도와의 상관관계는 데이터가 더 쌓이면 함께 살펴볼 예정이에요.",
                 badge="cron 자동수집",
             )
             df_w = pd.read_sql(
@@ -432,9 +430,9 @@ with tab_about:
         <div class="section-desc" style="margin-bottom:0;">
             CBNU SW캡스톤 졸업 프로젝트 <b>Nowhere</b>(Geofencing 기반 혼잡도 제보 앱)는
             Geofence로 현장 인증된 유저들의 동의·반대 투표로 제보자의 Trust Score를 조정하는
-            Peer Review 시스템을 갖고 있습니다. 그러나 서비스가 아직 런칭 전이라 실사용자 데이터가 없고,
-            Trust Score의 반대 임계값(현재 설계: 3개 초과분마다 감점)이 실제로 합리적인 값인지
-            검증할 데이터가 없는 상태였습니다. 이 파이프라인은 그 공백을 시뮬레이션 데이터로 채우기 위해 만들었습니다.
+            Peer Review 시스템을 갖고 있어요. 그런데 서비스가 아직 런칭 전이라 실사용자 데이터가 없다 보니,
+            Trust Score의 반대 임계값(지금 설계로는 3개 초과분마다 감점)이 정말 합리적인 값인지
+            확인할 방법이 없었어요. 이 파이프라인은 그 빈틈을 시뮬레이션 데이터로 채워보려고 만들었어요.
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -445,8 +443,8 @@ with tab_about:
         <div class="section-card" style="height:100%;">
             <div class="section-title">트랙 A — 신뢰도 임계값 최적화<span class="badge">Trust Score</span></div>
             <div class="section-desc" style="margin-bottom:0;">
-                시뮬레이션 데이터로 여러 반대 임계값을 실험하여, 어떤 값이 실제로 정확한 제보자와
-                부정확한(어뷰징) 제보자를 가장 잘 구별하는지 검증합니다.
+                시뮬레이션 데이터로 여러 반대 임계값을 실험해서, 어떤 값이 정확한 제보자와
+                부정확한(어뷰징) 제보자를 가장 잘 구별하는지 확인해요.
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -455,8 +453,8 @@ with tab_about:
         <div class="section-card" style="height:100%;">
             <div class="section-title">트랙 B — 시공간 혼잡도 패턴<span class="badge">혼잡도 패턴</span></div>
             <div class="section-desc" style="margin-bottom:0;">
-                장소×시간대별 혼잡도 패턴을 분석하고 기상청 공공데이터(날씨)를 결합하여,
-                향후 B2G(학교 행정실 대상) 리포트 제공의 기반을 마련합니다.
+                장소×시간대별 혼잡도 패턴을 분석하고 기상청 공공데이터(날씨)를 더해서,
+                앞으로 B2G(학교 행정실 대상) 리포트를 만들 수 있는 기반을 마련해요.
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -464,15 +462,15 @@ with tab_about:
     st.write("")
     st.markdown(f"""
     <div class="section-card">
-        <div class="section-title">데이터에 대한 정직한 설명</div>
+        <div class="section-title">데이터, 솔직하게 말씀드릴게요</div>
         <div class="section-desc">
-            이 대시보드의 모든 수치는 <b>합성(시뮬레이션) 데이터</b> 기준입니다. 서비스가 런칭 전이라
-            실사용자 데이터가 없는 콜드스타트 상황에 대한 표준적인 접근으로, 실제 백엔드와 동일한 스키마와
-            정책을 반영해 만들었습니다. 서비스 런칭 이후에는 같은 파이프라인에 실데이터를 흘려보내
-            정책을 재조정(recalibration)할 수 있도록 설계했습니다.
+            이 대시보드의 모든 수치는 <b>합성(시뮬레이션) 데이터</b>를 기준으로 해요. 서비스가 아직
+            런칭 전이라 실사용자 데이터가 없는 콜드스타트 상황이라, 실제 백엔드와 똑같은 스키마와
+            정책을 반영해서 만들었어요. 서비스가 런칭되면 같은 파이프라인에 실데이터를 흘려보내서
+            정책을 다시 검증(재조정)할 수 있게 설계해뒀어요.
         </div>
         <a href="https://github.com/CBNU-SWCapstone-B5-TJTS-now/data-pipeline"
            style="color:{P['blue']}; font-weight:600; font-size:14.5px; text-decoration:none;">
-           → GitHub repository에서 전체 코드와 README 보기</a>
+           → GitHub repository에서 전체 코드와 README를 확인해보세요</a>
     </div>
     """, unsafe_allow_html=True)
