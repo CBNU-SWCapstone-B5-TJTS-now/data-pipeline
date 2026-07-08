@@ -46,9 +46,9 @@ CREATE TABLE sim_reports (
     reporter_id          BIGINT,
     location_id          BIGINT,
     hour                 BIGINT,               -- 8~21
-    true_congestion      DOUBLE PRECISION,     -- 숨겨진 정답 혼잡도 (1~5 연속값)
+    true_congestion      TEXT,                 -- 숨겨진 정답 혼잡도 (LOW/MEDIUM/HIGH, 집계 시 1/2/3 순서형 매핑)
     true_accuracy        DOUBLE PRECISION,     -- 제보자의 true_accuracy 스냅샷
-    reported_congestion  BIGINT,               -- 제보된 혼잡도 (1~5)
+    reported_congestion  TEXT,                 -- 제보된 혼잡도 (LOW/MEDIUM/HIGH, 집계 시 1/2/3 순서형 매핑)
     report_lat           DOUBLE PRECISION,
     report_lon           DOUBLE PRECISION,
     report_geom          geography(Point, 4326),

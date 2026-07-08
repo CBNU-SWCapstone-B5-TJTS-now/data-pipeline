@@ -92,8 +92,11 @@ def step3_build_summary(conn):
                 day_of_week,
                 hour,
                 count(*) AS report_count,
-                round(avg(reported_congestion)::numeric, 2) AS avg_reported_congestion,
-                round(avg(true_congestion)::numeric, 2) AS avg_true_congestion
+                -- 혼잡도는 LOW/MEDIUM/HIGH 텍스트로 저장되어 있어, 집계 시 순서형(1/2/3)으로 매핑
+                round(avg(CASE reported_congestion
+                    WHEN 'LOW' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'HIGH' THEN 3 END)::numeric, 2) AS avg_reported_congestion,
+                round(avg(CASE true_congestion
+                    WHEN 'LOW' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'HIGH' THEN 3 END)::numeric, 2) AS avg_true_congestion
             FROM valid_reports
             GROUP BY location_id, location_name, category, day_of_week, hour
         ),

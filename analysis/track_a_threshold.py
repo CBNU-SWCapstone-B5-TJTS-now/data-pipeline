@@ -10,6 +10,8 @@
 
 최종 설계 반영: Trust Score 기본값 50, 범위 0~100 클리핑,
 반대 임계값 T까지 무사·초과분마다 -1, 동의 1개당 +1.
+혼잡도는 generate_simulation_data.py와 동일하게 LOW/MEDIUM/HIGH 3단계(순서형 1/2/3)로
+표현하고, 투표 정확도는 "정확히 일치"할 때만 정확한 제보로 판정한다.
 (generate_simulation_data.py와 동일한 시뮬레이션 로직 — 유저/제보/투표 생성 규칙만 재사용,
  여기서는 DB의 sim_* 테이블과 무관하게 독립적으로 반복 시뮬레이션한다.)
 """
@@ -29,6 +31,10 @@ N_USERS = 200
 N_REPORTS = 800
 THRESHOLDS = range(1, 11)
 SEEDS = range(1, 11)  # 다중 시드 10회
+
+CONGESTION_LEVELS = ["LOW", "MEDIUM", "HIGH"]
+CONGESTION_ORD = {"LOW": 1, "MEDIUM": 2, "HIGH": 3}
+ORD_TO_LEVEL = {v: k for k, v in CONGESTION_ORD.items()}
 
 
 def simulate_one_seed(seed: int):
@@ -51,23 +57,31 @@ def simulate_one_seed(seed: int):
         "hour": rng.choice(range(8, 22), N_REPORTS),
     })
 
-    def true_congestion(hour, location_id):
-        base = 2.0
-        if 12 <= hour <= 13:
-            base += 2.0
-        if 18 <= hour <= 19:
-            base += 1.0
+    def true_congestion_probs(hour, location_id):
+        is_peak = (12 <= hour <= 13) or (18 <= hour <= 19)
+        probs = np.array([0.15, 0.35, 0.50]) if is_peak else np.array([0.50, 0.35, 0.15])
         if location_id == 1:
-            base += 0.5
-        return float(np.clip(base + rng.normal(0, 0.4), 1, 5))
+            probs = np.clip(probs + np.array([-0.10, 0.0, 0.10]), 0.05, None)
+            probs = probs / probs.sum()
+        return probs
+
+    def sample_true_congestion(hour, location_id):
+        probs = true_congestion_probs(hour, location_id)
+        return rng.choice(CONGESTION_LEVELS, p=probs)
 
     reports["true_congestion"] = reports.apply(
-        lambda r: true_congestion(r["hour"], r["location_id"]), axis=1
+        lambda r: sample_true_congestion(r["hour"], r["location_id"]), axis=1
     )
     reports = reports.merge(users[["user_id", "true_accuracy"]], left_on="reporter_id", right_on="user_id")
+
+    def sample_reported_congestion(true_level, true_accuracy):
+        true_ord = CONGESTION_ORD[true_level]
+        noise = rng.normal(0, (1 - true_accuracy) * 1.2)
+        reported_ord = int(np.clip(round(true_ord + noise), 1, 3))
+        return ORD_TO_LEVEL[reported_ord]
+
     reports["reported_congestion"] = reports.apply(
-        lambda r: round(np.clip(r["true_congestion"] + rng.normal(0, (1 - r["true_accuracy"]) * 3), 1, 5)),
-        axis=1,
+        lambda r: sample_reported_congestion(r["true_congestion"], r["true_accuracy"]), axis=1,
     )
     reports = reports.drop(columns=["user_id"])
 
@@ -78,7 +92,8 @@ def simulate_one_seed(seed: int):
         voters = rng.choice(users["user_id"], n_voters, replace=False)
         for voter_id in voters:
             voter_acc = users.loc[users["user_id"] == voter_id, "true_accuracy"].values[0]
-            is_report_accurate = abs(rep["reported_congestion"] - rep["true_congestion"]) <= 1
+            # 3단계 척도에서는 "정확히 일치"할 때만 정확한 제보로 판정
+            is_report_accurate = rep["reported_congestion"] == rep["true_congestion"]
             agree_prob = voter_acc if is_report_accurate else (1 - voter_acc)
             vote_type = "agree" if rng.random() < agree_prob else "disagree"
             votes_list.append({

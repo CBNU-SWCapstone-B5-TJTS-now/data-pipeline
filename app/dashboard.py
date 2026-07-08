@@ -214,6 +214,11 @@ def fig_to_base64(fig) -> str:
     return base64.b64encode(buf.read()).decode()
 
 
+def file_to_base64(path: str) -> str:
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+
 def hero_card_number(label: str, number: str, unit: str, desc: str):
     st.markdown(f"""
     <div class="hero-card">
@@ -372,8 +377,9 @@ with tab_b:
 
         hero_card_number(
             "가장 혼잡한 시간대의 평균 혼잡도",
-            f"{busiest['avg_reported_congestion']:.1f}", f"/ 5.0 · {busiest['location_name']} {int(busiest['hour'])}시",
-            "점심(12-13시)과 저녁(18-19시)에 전체 장소에서 공통적으로 붐볐어요.",
+            f"{busiest['avg_reported_congestion']:.1f}", f"/ 3.0 · {busiest['location_name']} {int(busiest['hour'])}시",
+            "점심(12-13시)과 저녁(18-19시)에 전체 장소에서 공통적으로 붐볐어요. "
+            "(혼잡도는 LOW=1 · MEDIUM=2 · HIGH=3 순서형 점수 기준)",
         )
 
         col1, col2 = st.columns(2)
@@ -427,7 +433,8 @@ with tab_b:
                             zoom_start=16)
             for _, loc in locations.iterrows():
                 avg_c = df_b[df_b["location_name"] == loc["name"]]["avg_reported_congestion"].mean()
-                color = "red" if avg_c >= 3.5 else ("orange" if avg_c >= 2.5 else "green")
+                # 혼잡도 1~3 순서형 척도 기준 (LOW=1, MEDIUM=2, HIGH=3)
+                color = "red" if avg_c >= 2.5 else ("orange" if avg_c >= 1.5 else "green")
                 folium.CircleMarker(
                     location=[loc["latitude"], loc["longitude"]],
                     radius=15, color=color, fill=True, fill_color=color,
@@ -470,13 +477,30 @@ with tab_b:
 with tab_about:
     st.markdown(f"""
     <div class="section-card">
-        <div class="section-title">이 프로젝트를 시작한 이유</div>
+        <div class="section-title">이 프로젝트는 무엇인가요?</div>
         <div class="section-desc" style="margin-bottom:0;">
-            CBNU SW캡스톤 졸업 프로젝트 <b>Nowhere</b>(Geofencing 기반 혼잡도 제보 앱)는
-            Geofence로 현장 인증된 유저들의 동의·반대 투표로 제보자의 Trust Score를 조정하는
-            Peer Review 시스템을 갖고 있어요. 그런데 서비스가 아직 런칭 전이라 실사용자 데이터가 없다 보니,
-            Trust Score의 반대 임계값(지금 설계로는 3개 초과분마다 감점)이 정말 합리적인 값인지
-            확인할 방법이 없었어요. 이 파이프라인은 그 빈틈을 시뮬레이션 데이터로 채워보려고 만들었어요.
+            Nowhere는 CBNU SW캡스톤 졸업 프로젝트로 만든 Geofencing 기반 실시간 혼잡도 제보
+            앱이에요. 학식·도서관·카페 같은 캠퍼스 거점의 혼잡도를 사용자들이 직접 제보하고,
+            근처에 있는 다른 사용자들이 그 제보가 맞는지 검증해요. 이 검증 과정을 Peer Review라고
+            부르고, 검증 결과에 따라 제보자의 신뢰도 점수(Trust Score)가 오르내려요.
+            이 페이지는 그 Peer Review 시스템의 핵심 질문 — "반대가 몇 개 모이면 신뢰도를
+            깎아야 할까?" — 를 실제 서비스가 런칭되기 전에 시뮬레이션 데이터로 미리 검증해본
+            결과예요.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown(f"""
+    <div class="section-card">
+        <div class="section-title">실제 서비스는 이렇게 동작해요</div>
+        <div class="section-desc" style="margin-bottom:0;">
+            <ol style="margin:0; padding-left:20px;">
+                <li>사용자 A가 혼잡도를 제보하면 지도에 바로 반영돼요</li>
+                <li>근처에 있는 사용자 B, C, D가 그 제보를 보고 "맞아요" 또는 "틀려요"로 검증해요</li>
+                <li>이 결과는 SSE(실시간 스트리밍)로 접속 중인 모든 사용자에게 즉시 전달돼요</li>
+                <li>제보 유효시간이 끝나면, 서버가 자동으로 제보자의 Trust Score를 갱신해요</li>
+            </ol>
+            <div style="margin-top:14px;">이 흐름에서 "반대가 몇 개면 감점할지"를 정하는 게 이 프로젝트가 답하려는 질문이에요.</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -504,6 +528,26 @@ with tab_about:
         """, unsafe_allow_html=True)
 
     st.write("")
+
+    diagram_path = "docs/workflow_diagram.png"
+    diagram_html = (
+        f'<img src="data:image/png;base64,{file_to_base64(diagram_path)}">'
+        if os.path.exists(diagram_path) else ""
+    )
+    st.markdown(f"""
+    <div class="section-card">
+        <div class="section-title">어떻게 만들었나요</div>
+        <div class="section-desc">
+            OCI 가상서버(vm-03) 위에 PostgreSQL+PostGIS로 데이터를 저장하고, Python으로
+            시뮬레이션 데이터를 만들어서 분석했어요. 기상청 공공데이터도 매시간 자동으로
+            모으고 있고요. 이 페이지는 nginx를 통해 외부에 공개돼 있어요. 전체 구조는 아래
+            그림에서 확인할 수 있어요.
+        </div>
+        {diagram_html}
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.write("")
     st.markdown(f"""
     <div class="section-card">
         <div class="section-title">데이터, 솔직하게 말씀드릴게요</div>
@@ -511,10 +555,47 @@ with tab_about:
             이 대시보드의 모든 수치는 <b>합성(시뮬레이션) 데이터</b>를 기준으로 해요. 서비스가 아직
             런칭 전이라 실사용자 데이터가 없는 콜드스타트 상황이라, 실제 백엔드와 똑같은 스키마와
             정책을 반영해서 만들었어요. 서비스가 런칭되면 같은 파이프라인에 실데이터를 흘려보내서
-            정책을 다시 검증(재조정)할 수 있게 설계해뒀어요.
+            정책을 다시 검증(재조정)할 수 있게 설계해뒀어요.<br><br>
+            실제 서비스의 혼잡도는 LOW/MEDIUM/HIGH 3단계로 표현되는데, 이 시뮬레이션은
+            통계 분석 편의를 위해 이 3단계를 그대로 순서형 점수로 다뤘어요.<br>
+            Trust Score의 기본점수(50)와 동의 반영(+1) 규칙은 현재 배포된 코드가 아니라
+            팀이 다음 단계로 검토 중인 확장 설계를 기준으로 시뮬레이션했어요.
         </div>
-        <a href="https://github.com/CBNU-SWCapstone-B5-TJTS-now/data-pipeline"
-           style="color:{P['blue']}; font-weight:600; font-size:14.5px; text-decoration:none;">
-           → GitHub repository에서 전체 코드와 README를 확인해보세요</a>
+        <a href="https://github.com/CBNU-SWCapstone-B5-TJTS-now/data-pipeline" target="_blank"
+           style="display:inline-block; margin-top:6px; padding:11px 22px; background:{P['blue']};
+                  color:#FFFFFF; font-weight:700; font-size:14.5px; border-radius:12px;
+                  text-decoration:none;">
+           GitHub Repository 방문하기</a>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ---- 푸터: 데이터 출처 / 기술 스택 ----
+    footer_bg = P["text1"] if not st.session_state.dark_mode else P["card"]
+    footer_text = P["bg"] if not st.session_state.dark_mode else P["text1"]
+    footer_label = P["text3"] if not st.session_state.dark_mode else P["text2"]
+
+    st.write("")
+    st.markdown(f"""
+    <div style="background:{footer_bg}; border-radius:20px; padding:36px 40px;">
+        <div style="display:flex; gap:48px; flex-wrap:wrap;">
+            <div style="flex:1; min-width:220px;">
+                <div style="font-size:13.5px; font-weight:700; color:{footer_label}; margin-bottom:12px; letter-spacing:0.3px;">데이터 출처</div>
+                <div style="color:{footer_text}; font-size:14.5px; line-height:2;">
+                    기상청 공공데이터포털 — 초단기실황 조회 API<br>
+                    시뮬레이션 데이터 (실제 백엔드 스키마 기반 합성 생성)
+                </div>
+            </div>
+            <div style="flex:1; min-width:220px;">
+                <div style="font-size:13.5px; font-weight:700; color:{footer_label}; margin-bottom:12px; letter-spacing:0.3px;">기술 스택</div>
+                <div style="color:{footer_text}; font-size:14.5px; line-height:2;">
+                    수집·처리 — Python, pandas, requests<br>
+                    저장 — PostgreSQL 16 + PostGIS, OCI Block Volume, Object Storage<br>
+                    시각화 — Streamlit, matplotlib, folium
+                </div>
+            </div>
+        </div>
+        <div style="text-align:center; font-size:12.5px; color:{footer_label}; margin-top:32px; padding-top:20px; border-top:1px solid {P['border']};">
+            충북대학교 소프트웨어학과 · Cloud 기반 데이터AI 파이프라인구축 · 2026
+        </div>
     </div>
     """, unsafe_allow_html=True)
