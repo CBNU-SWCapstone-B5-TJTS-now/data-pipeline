@@ -54,11 +54,13 @@ LIGHT = dict(
     bg="#F2F4F6", card="#FFFFFF", text1="#191F28", text2="#4E5968", text3="#8B95A1",
     border="#E5E8EB", blue="#3182F6", blue_dark="#1B64DA", mint="#05A88E", gray="#B0B8C1",
     badge_bg="#E8F3FF", shadow="rgba(0,0,0,0.04)", header_bg="#F2F4F6",
+    info_bg="#E8F3FF", info_text="#1B64DA", mint_rgb="5,168,142",
 )
 DARK = dict(
     bg="#101216", card="#1C1F26", text1="#F2F4F6", text2="#B0B8C1", text3="#7C8592",
     border="#2B2F38", blue="#5B9DFF", blue_dark="#3182F6", mint="#2FE1C4", gray="#545B66",
     badge_bg="#1A2C4A", shadow="rgba(0,0,0,0.35)", header_bg="#101216",
+    info_bg="#1A2C4A", info_text="#EAF2FF", mint_rgb="47,225,196",
 )
 
 if "dark_mode" not in st.session_state:
@@ -135,17 +137,49 @@ header[data-testid="stHeader"] * {{ color: {P['text1']} !important; }}
     background: {P['card']}; border-radius: 999px; padding: 10px 22px;
     font-weight: 600; font-size: 14.5px; color: {P['text3']}; border: 1px solid {P['border']};
     display: flex; align-items: center; gap: 6px; line-height: 1.3;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }}
 .stTabs [data-baseweb="tab"] p {{ display: flex; align-items: center; gap: 6px; margin: 0; }}
-.stTabs [aria-selected="true"] {{ background: {P['text1']} !important; color: {P['bg']} !important; border-color: {P['text1']} !important; }}
+/* 활성 탭: 라이트/다크 공통으로 브랜드 블루 사용 (다크모드에서 흑백 반전이 튀어 보이던 것 수정) */
+.stTabs [aria-selected="true"] {{
+    background: {P['blue']} !important; color: #FFFFFF !important; border-color: {P['blue']} !important;
+}}
 
-div[data-testid="stExpander"] {{ border-radius: 16px; border: 1px solid {P['border']}; background: {P['card']}; }}
+/* 아코디언(Expander): 헤더 배경/글자/화살표 아이콘 명도 대비 확보 (다크모드에서 텍스트가 안 보이던 문제 수정) */
+div[data-testid="stExpander"] {{ border-radius: 16px; border: 1px solid {P['border']}; background: {P['card']}; overflow: hidden; }}
+div[data-testid="stExpander"] summary {{ background: {P['card']} !important; color: {P['text1']} !important; }}
+div[data-testid="stExpander"] summary:hover {{ background: {P['bg']} !important; }}
+div[data-testid="stExpander"] summary p {{ color: {P['text1']} !important; font-weight: 600; }}
+div[data-testid="stExpander"] summary svg {{ fill: {P['text1']} !important; color: {P['text1']} !important; }}
+div[data-testid="stExpander"] details {{ background: {P['card']}; }}
+
 div[data-testid="stDataFrame"] {{ border-radius: 12px; overflow: hidden; }}
-div[data-testid="stAlert"] {{ border-radius: 14px; }}
+
+/* 경고/안내 배너(st.info 등): 배경-글자 명도 대비 확보 (다크모드에서 어두운 파랑끼리 겹쳐 안 보이던 문제 수정) */
+div[data-testid="stAlert"] {{
+    border-radius: 14px; background: {P['info_bg']} !important; border: 1px solid {P['border']};
+}}
+div[data-testid="stAlert"] p {{ color: {P['info_text']} !important; }}
+div[data-testid="stAlert"] svg {{ color: {P['info_text']} !important; fill: {P['info_text']} !important; }}
+
+/* 차트/이미지 우측 상단의 Streamlit 기본 툴바(전체화면 버튼 등) 정돈 — 본문과 겹치지 않게 카드 톤에 맞춤 */
+[data-testid="StyledFullScreenButton"], [data-testid="stElementToolbar"] {{
+    background: {P['card']} !important; border: 1px solid {P['border']}; border-radius: 8px;
+    top: 10px !important; right: 10px !important;
+}}
+[data-testid="StyledFullScreenButton"] svg, [data-testid="stElementToolbar"] svg {{
+    fill: {P['text2']} !important; color: {P['text2']} !important;
+}}
+
+/* 결론 강조 카드: 히어로 카드(파랑)와 색으로 연결되도록 최적값 카드에 민트 테두리/글로우 부여 */
+.stat-card.highlight {{
+    border: 1.5px solid {P['mint']};
+    box-shadow: 0 0 0 3px rgba({P['mint_rgb']}, 0.12);
+}}
 
 /* 라이트/다크 토글 버튼 (앱 전체에서 유일한 st.button) */
 div[data-testid="stButton"] {{
-    position: fixed; bottom: 24px; right: 24px; z-index: 9999; width: auto;
+    position: fixed; bottom: 28px; right: 28px; z-index: 9999; width: auto;
 }}
 div[data-testid="stButton"] button {{
     border-radius: 50%; width: 52px; height: 52px; padding: 0;
@@ -181,10 +215,11 @@ def hero_card_number(label: str, number: str, unit: str, desc: str):
     """, unsafe_allow_html=True)
 
 
-def stat_card(label: str, number: str, sub: str, positive: bool = False):
+def stat_card(label: str, number: str, sub: str, positive: bool = False, highlight: bool = False):
     cls = "stat-number positive" if positive else "stat-number"
+    card_cls = "stat-card highlight" if highlight else "stat-card"
     st.markdown(f"""
-    <div class="stat-card">
+    <div class="{card_cls}">
         <div class="stat-label">{label}</div>
         <div class="{cls}">{number}</div>
         <div class="stat-sub">{sub}</div>
@@ -265,7 +300,7 @@ with tab_a:
         with col1:
             stat_card("현재 정책값 상관계수", f"{policy_corr:.3f}" if policy_corr else "-", "반대 3개 기준")
         with col2:
-            stat_card("최적값 상관계수", f"{best_corr:.3f}", f"반대 {best_th}개 기준", positive=True)
+            stat_card("최적값 상관계수", f"{best_corr:.3f}", f"반대 {best_th}개 기준", positive=True, highlight=True)
 
         st.write("")
 
