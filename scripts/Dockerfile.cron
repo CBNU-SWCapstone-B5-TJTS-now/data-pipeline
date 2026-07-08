@@ -1,0 +1,26 @@
+# Nowhere Data Pipeline - 기상청 공공데이터 수집 cron 컨테이너
+# 설계 수준 초안 (실사용 마이그레이션 전 이식성 검증용, 미실행 검증)
+# vm-03에서는 시스템 crontab(매시 정각)으로 fetch_weather.py를 실행했는데,
+# 컨테이너 환경에서는 별도 cron 데몬을 컨테이너 안에 포함시키는 방식으로 대체.
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    cron \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY scripts/fetch_weather.py ./scripts/fetch_weather.py
+
+# 매시 정각 실행 (vm-03의 시스템 crontab과 동일한 스케줄)
+# 컨테이너 환경변수는 기본적으로 cron 작업에 전달되지 않으므로,
+# 실행 시점에 환경변수를 파일로 덤프해 cron job에서 source 하도록 구성
+RUN echo "0 * * * * root env >> /etc/environment; /usr/local/bin/python /app/scripts/fetch_weather.py >> /var/log/fetch_weather.log 2>&1" > /etc/cron.d/fetch-weather \
+    && chmod 0644 /etc/cron.d/fetch-weather \
+    && touch /var/log/fetch_weather.log
+
+CMD ["cron", "-f"]

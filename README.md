@@ -128,7 +128,30 @@ streamlit run app/dashboard.py --server.port 8501
 - 반대(disagree) 3개까지는 무사, **초과분마다 -1씩 누적 감점**
 - Trust Score는 제보 즉시가 아니라 **제보 만료 시점에 배치로 반영** (실제 스케줄러 구조와 동일한 철학)
 
-## 6. 한계점 및 향후 개선 방향
+## 6. 이식성 확보를 위한 컨테이너화 설계
+
+현재 vm-03에는 PostgreSQL, Streamlit, cron, nginx를 모두 호스트에 직접 설치해 운영하고 있습니다. 향후 실사용자 환경으로 이전할 가능성을 대비해, 아래와 같이 **Docker Compose 기반 컨테이너화 설계**를 별도로 마련해두었습니다.
+
+> ⚠️ 아래 구성은 설계 수준 산출물이며 실제 `docker compose up` 검증은 수행하지 않았습니다. vm-03 실배포는 지금까지와 동일하게 호스트 직접 설치 방식으로 운영됩니다.
+
+| 서비스 | 이미지/빌드 | 역할 |
+|---|---|---|
+| `postgres` | `postgis/postgis:16-3.3` | DB. 호스트 5432와 충돌 방지 위해 5433으로 매핑 |
+| `streamlit` | `app/Dockerfile` (커스텀 빌드) | 대시보드. 외부 미노출, nginx 경유만 허용 |
+| `cron` | `scripts/Dockerfile.cron` (커스텀 빌드) | 기상청 API 매시간 자동 수집 |
+| `nginx` | `nginx:1.25-alpine` | 80 → streamlit 리버스 프록시 |
+
+Oracle Linux 8 + SELinux(Enforcing) 환경을 고려해 모든 바인드 마운트에 `:z` 플래그를 적용했고, DB 비밀번호·API 키는 `.env` 파일로 주입해 이미지에 하드코딩되지 않도록 설계했습니다.
+
+```
+docker-compose.yml
+app/Dockerfile
+scripts/Dockerfile.cron
+nginx/nginx.conf
+requirements.txt
+```
+
+## 7. 한계점 및 향후 개선 방향
 
 - **합성 데이터 기반**: 서비스 런칭 전이라 실사용자 데이터가 없어 시뮬레이션으로 대체함. 런칭 후 동일 파이프라인을 실데이터로 재조정(recalibration) 예정
 - **가중치 알고리즘 미구현**: "고신뢰 유저 제보에 더 큰 영향력을 부여"하는 가중 투표 알고리즘은 이번 과제 범위를 벗어나 시뮬레이션 근거 제시까지만 다룸
@@ -141,19 +164,27 @@ streamlit run app/dashboard.py --server.port 8501
 ```
 data-pipeline/
 ├── README.md
+├── requirements.txt                   # Python 패키지 의존성
+├── docker-compose.yml                 # 컨테이너화 설계 초안 (미검증)
+├── .env.example
 ├── scripts/
 │   ├── setup_postgis.md              # PostgreSQL+PostGIS 설치 가이드
-│   ├── schema.sql                     # DB 스키마
+│   ├── schema.sql                     # DB 스키마 (vm-03 실배포 기준)
 │   ├── generate_simulation_data.py
 │   ├── fetch_weather.py               # 기상청 공공데이터 API 연동
-│   └── upload_to_object_storage.py    # Object Storage 백업
+│   ├── upload_to_object_storage.py    # Object Storage 백업
+│   └── Dockerfile.cron                # cron 컨테이너 빌드 (설계 초안)
 ├── analysis/
 │   ├── track_a_threshold.py           # 트랙 A: 임계값 분석
 │   └── track_b_spatiotemporal.py      # 트랙 B: 시공간 패턴 분석
 ├── app/
-│   └── dashboard.py                    # Streamlit 대시보드
+│   ├── dashboard.py                    # Streamlit 대시보드
+│   └── Dockerfile                      # streamlit 컨테이너 빌드 (설계 초안)
+├── nginx/
+│   └── nginx.conf                      # 컨테이너용 nginx 설정 (설계 초안)
 └── docs/
-    └── workflow_diagram.png            # 전체 워크플로우 다이어그램
+    ├── workflow_diagram.png            # 전체 워크플로우 다이어그램
+    └── screenshots/                    # 실행 화면 캡처
 ```
 
 ## 관련 저장소

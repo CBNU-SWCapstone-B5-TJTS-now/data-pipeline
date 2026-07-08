@@ -20,7 +20,7 @@ load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env
 API_KEY = os.environ.get("WEATHER_API_KEY", "")
 DB_USER = "crowd_app"
 DB_PASSWORD = os.environ.get("CROWD_APP_PW", "")
-DB_HOST = "localhost"
+DB_HOST = os.environ.get("DB_HOST", "localhost")  # Docker에서는 서비스명(postgres)으로 오버라이드
 DB_PORT = 5432
 DB_NAME = "crowd_pipeline"
 
