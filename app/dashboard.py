@@ -1,15 +1,16 @@
 """
-Nowhere Data Pipeline - Streamlit 대시보드 (Toss 스타일 리포트형 UI)
-트랙 A(Trust Score 임계값) / 트랙 B(시공간 혼잡도 패턴) 탭으로 구성.
+Nowhere Data Pipeline - Streamlit 대시보드 (Toss 스타일 리포트형 UI, 라이트/다크 토글)
 
 실행: streamlit run app/dashboard.py --server.port 8501
 
-구현 노트: Streamlit은 st.markdown()으로 연 <div>를 다른 st.* 호출(st.pyplot 등)을
-사이에 두고 별도의 st.markdown()으로 닫을 수 없다 (각 호출이 독립된 DOM 요소로
-렌더링되어 카드가 빈 채로 쪼개짐). 그래서 카드 안에 차트가 들어가는 경우 matplotlib
-figure를 base64 PNG로 변환해 설명 텍스트와 함께 하나의 st.markdown() 호출로 묶는다.
-지도(folium)·데이터표처럼 통째로 합치기 어려운 요소는 카드로 감싸지 않고,
-설명 카드 바로 아래에 Streamlit 기본 위젯을 그대로 배치한다.
+구현 노트:
+- Streamlit은 st.markdown()으로 연 <div>를 다른 st.* 호출 사이에 두고 별도
+  st.markdown()으로 닫을 수 없다 (각 호출이 독립된 DOM으로 렌더링되어 카드가
+  빈 채로 쪼개짐). 카드 안에 차트가 들어가는 경우 matplotlib figure를 base64
+  PNG로 변환해 설명 텍스트와 하나의 st.markdown() 호출로 묶는다.
+- 라이트/다크 모드는 st.session_state로 전환하며, 우측 하단 원형 버튼(유일한
+  st.button)으로 토글한다. 팔레트를 딕셔너리로 분리해 CSS와 matplotlib 차트
+  양쪽에 동일하게 적용한다.
 """
 import os
 import io
@@ -47,92 +48,125 @@ def table_exists(engine, table_name: str) -> bool:
 engine = get_engine()
 
 # =========================================================
-# 디자인 시스템 (Toss 스타일) — 전역 CSS 주입
+# 라이트/다크 팔레트
 # =========================================================
-st.markdown("""
+LIGHT = dict(
+    bg="#F2F4F6", card="#FFFFFF", text1="#191F28", text2="#4E5968", text3="#8B95A1",
+    border="#E5E8EB", blue="#3182F6", blue_dark="#1B64DA", mint="#05A88E", gray="#B0B8C1",
+    badge_bg="#E8F3FF", shadow="rgba(0,0,0,0.04)", header_bg="#F2F4F6",
+)
+DARK = dict(
+    bg="#101216", card="#1C1F26", text1="#F2F4F6", text2="#B0B8C1", text3="#7C8592",
+    border="#2B2F38", blue="#5B9DFF", blue_dark="#3182F6", mint="#2FE1C4", gray="#545B66",
+    badge_bg="#1A2C4A", shadow="rgba(0,0,0,0.35)", header_bg="#101216",
+)
+
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
+
+P = DARK if st.session_state.dark_mode else LIGHT
+
+# =========================================================
+# 전역 CSS 주입 (팔레트 변수 반영)
+# =========================================================
+st.markdown(f"""
 <style>
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
 
-html, body, [class*="css"] {
+html, body, [class*="css"] {{
     font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
-}
+}}
 
-.stApp { background: #F2F4F6; }
-.block-container { padding-top: 1.8rem; max-width: 1180px; }
+.stApp {{ background: {P['bg']}; }}
+.block-container {{ padding-top: 1.8rem; max-width: 1180px; }}
 
-/* Streamlit 기본 상단 헤더바(햄버거 메뉴 영역)가 시스템 다크모드를 따라가면서
-   흰 배경 디자인과 충돌하는 문제 방지 — 배경을 페이지와 동일하게 맞춤 */
-header[data-testid="stHeader"] {
-    background: #F2F4F6;
-}
-header[data-testid="stHeader"] * {
-    color: #191F28 !important;
-}
+header[data-testid="stHeader"] {{ background: {P['header_bg']}; }}
+header[data-testid="stHeader"] * {{ color: {P['text1']} !important; }}
 
-.eyebrow {
-    font-size: 14px; font-weight: 700; color: #3182F6;
+.eyebrow {{
+    font-size: 14px; font-weight: 700; color: {P['blue']};
     letter-spacing: 0.3px; margin-top: 8px; margin-bottom: 8px;
-}
-.page-title {
+}}
+.page-title {{
     font-size: 30px; font-weight: 800; letter-spacing: -0.6px;
-    color: #191F28; margin-bottom: 4px; line-height: 1.35;
-}
-.page-subtitle { font-size: 15.5px; color: #4E5968; margin-bottom: 28px; }
+    color: {P['text1']}; margin-bottom: 4px; line-height: 1.35;
+}}
+.page-subtitle {{ font-size: 15.5px; color: {P['text2']}; margin-bottom: 28px; }}
 
-.hero-card {
-    background: linear-gradient(135deg, #3182F6 0%, #1B64DA 100%);
+.hero-card {{
+    background: linear-gradient(135deg, {P['blue']} 0%, {P['blue_dark']} 100%);
     border-radius: 24px; padding: 36px 40px; color: white;
     margin-bottom: 18px; box-shadow: 0 8px 24px rgba(49,130,246,0.22);
-}
-.hero-label { font-size: 14.5px; font-weight: 600; opacity: 0.88; margin-bottom: 10px; }
-.hero-main { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.hero-number { font-size: 52px; font-weight: 800; letter-spacing: -1.2px;
-    font-variant-numeric: tabular-nums; line-height: 1; }
-.hero-place { font-size: 26px; font-weight: 700; opacity: 0.95; }
-.hero-desc { font-size: 14.5px; opacity: 0.92; margin-top: 14px; line-height: 1.6; }
+}}
+.hero-label {{ font-size: 14.5px; font-weight: 600; opacity: 0.88; margin-bottom: 10px; }}
+.hero-main {{ display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }}
+.hero-number {{ font-size: 52px; font-weight: 800; letter-spacing: -1.2px;
+    font-variant-numeric: tabular-nums; line-height: 1; }}
+.hero-place {{ font-size: 26px; font-weight: 700; opacity: 0.95; }}
+.hero-desc {{ font-size: 14.5px; opacity: 0.92; margin-top: 14px; line-height: 1.6; }}
 
-.stat-card {
-    background: white; border-radius: 18px; padding: 22px 26px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04); height: 100%;
-}
-.stat-label { font-size: 13.5px; color: #8B95A1; font-weight: 600; margin-bottom: 6px; }
-.stat-number { font-size: 28px; font-weight: 800; letter-spacing: -0.8px; color: #191F28; }
-.stat-number.positive { color: #05A88E; }
-.stat-sub { font-size: 12.5px; color: #8B95A1; margin-top: 5px; }
+.stat-card {{
+    background: {P['card']}; border-radius: 18px; padding: 22px 26px;
+    box-shadow: 0 2px 8px {P['shadow']}; height: 100%; border: 1px solid {P['border']};
+}}
+.stat-label {{ font-size: 13.5px; color: {P['text3']}; font-weight: 600; margin-bottom: 6px; }}
+.stat-number {{ font-size: 28px; font-weight: 800; letter-spacing: -0.8px; color: {P['text1']}; }}
+.stat-number.positive {{ color: {P['mint']}; }}
+.stat-sub {{ font-size: 12.5px; color: {P['text3']}; margin-top: 5px; }}
 
-.section-card {
-    background: white; border-radius: 20px; padding: 30px 32px;
-    margin-bottom: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-}
-.section-title { font-size: 18.5px; font-weight: 700; color: #191F28; margin-bottom: 8px; }
-.section-desc { font-size: 14.5px; color: #4E5968; line-height: 1.75; margin-bottom: 18px; }
-.section-card img { width: 100%; border-radius: 12px; margin-top: 4px; }
+.section-card {{
+    background: {P['card']}; border-radius: 20px; padding: 30px 32px;
+    margin-bottom: 18px; box-shadow: 0 2px 8px {P['shadow']}; border: 1px solid {P['border']};
+}}
+.section-title {{ font-size: 18.5px; font-weight: 700; color: {P['text1']}; margin-bottom: 8px; }}
+.section-desc {{ font-size: 14.5px; color: {P['text2']}; line-height: 1.75; margin-bottom: 18px; }}
+.section-card img {{ width: 100%; border-radius: 12px; margin-top: 4px; }}
 
-.badge {
-    display: inline-block; background: #E8F3FF; color: #3182F6;
+.badge {{
+    display: inline-block; background: {P['badge_bg']}; color: {P['blue']};
     font-size: 12px; font-weight: 700; padding: 3px 11px; border-radius: 999px;
     margin-left: 6px; vertical-align: middle;
-}
+}}
 
-.stTabs [data-baseweb="tab-list"] { gap: 6px; background: transparent; margin-bottom: 22px; }
-.stTabs [data-baseweb="tab"] {
-    background: white; border-radius: 999px; padding: 10px 22px;
-    font-weight: 600; font-size: 14.5px; color: #8B95A1; border: none;
+.stTabs [data-baseweb="tab-list"] {{ gap: 6px; background: transparent; margin-bottom: 22px; }}
+.stTabs [data-baseweb="tab-highlight"] {{ display: none; }}
+.stTabs [data-baseweb="tab-border"] {{ display: none; }}
+.stTabs [data-baseweb="tab"] {{
+    background: {P['card']}; border-radius: 999px; padding: 10px 22px;
+    font-weight: 600; font-size: 14.5px; color: {P['text3']}; border: 1px solid {P['border']};
     display: flex; align-items: center; gap: 6px; line-height: 1.3;
-}
-.stTabs [data-baseweb="tab"] p { display: flex; align-items: center; gap: 6px; margin: 0; }
-.stTabs [aria-selected="true"] { background: #191F28 !important; color: white !important; }
+}}
+.stTabs [data-baseweb="tab"] p {{ display: flex; align-items: center; gap: 6px; margin: 0; }}
+.stTabs [aria-selected="true"] {{ background: {P['text1']} !important; color: {P['bg']} !important; border-color: {P['text1']} !important; }}
 
-div[data-testid="stExpander"] { border-radius: 16px; border: 1px solid #E5E8EB; background: white; }
-div[data-testid="stDataFrame"] { border-radius: 12px; overflow: hidden; }
-div[data-testid="stAlert"] { border-radius: 14px; }
+div[data-testid="stExpander"] {{ border-radius: 16px; border: 1px solid {P['border']}; background: {P['card']}; }}
+div[data-testid="stDataFrame"] {{ border-radius: 12px; overflow: hidden; }}
+div[data-testid="stAlert"] {{ border-radius: 14px; }}
+
+/* 라이트/다크 토글 버튼 (앱 전체에서 유일한 st.button) */
+div[data-testid="stButton"] {{
+    position: fixed; bottom: 24px; right: 24px; z-index: 9999; width: auto;
+}}
+div[data-testid="stButton"] button {{
+    border-radius: 50%; width: 52px; height: 52px; padding: 0;
+    background: {P['card']}; border: 1px solid {P['border']};
+    box-shadow: 0 4px 14px {P['shadow']}; font-size: 20px;
+}}
 </style>
 """, unsafe_allow_html=True)
 
 
+def toggle_theme():
+    st.session_state.dark_mode = not st.session_state.dark_mode
+
+
+st.button("🌙" if not st.session_state.dark_mode else "☀️", on_click=toggle_theme,
+          help="라이트/다크 모드 전환")
+
+
 def fig_to_base64(fig) -> str:
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=160, bbox_inches="tight", facecolor="white")
+    fig.savefig(buf, format="png", dpi=160, bbox_inches="tight", facecolor=P["card"])
     buf.seek(0)
     return base64.b64encode(buf.read()).decode()
 
@@ -159,7 +193,6 @@ def stat_card(label: str, number: str, sub: str, positive: bool = False):
 
 
 def section_card_with_image(title: str, desc: str, fig, badge: str = ""):
-    """설명 텍스트 + 차트 이미지를 하나의 카드(단일 st.markdown 호출)로 묶는다."""
     badge_html = f'<span class="badge">{badge}</span>' if badge else ""
     b64 = fig_to_base64(fig)
     st.markdown(f"""
@@ -172,7 +205,6 @@ def section_card_with_image(title: str, desc: str, fig, badge: str = ""):
 
 
 def section_text_card(title: str, desc: str, badge: str = ""):
-    """텍스트만 있는 카드 (뒤에 별도 Streamlit 위젯이 이어질 때 사용)."""
     badge_html = f'<span class="badge">{badge}</span>' if badge else ""
     st.markdown(f"""
     <div class="section-card" style="margin-bottom: 8px;">
@@ -182,20 +214,16 @@ def section_text_card(title: str, desc: str, badge: str = ""):
     """, unsafe_allow_html=True)
 
 
-TOSS_BLUE = "#3182F6"
-TOSS_MINT = "#05A88E"
-TOSS_GRAY = "#B0B8C1"
-
-
 def style_axes(ax):
+    ax.set_facecolor(P["card"])
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.spines["left"].set_color("#E5E8EB")
-    ax.spines["bottom"].set_color("#E5E8EB")
-    ax.tick_params(colors="#8B95A1")
-    ax.xaxis.label.set_color("#4E5968")
-    ax.yaxis.label.set_color("#4E5968")
-    ax.grid(alpha=0.25, color="#E5E8EB")
+    ax.spines["left"].set_color(P["border"])
+    ax.spines["bottom"].set_color(P["border"])
+    ax.tick_params(colors=P["text3"])
+    ax.xaxis.label.set_color(P["text2"])
+    ax.yaxis.label.set_color(P["text2"])
+    ax.grid(alpha=0.25, color=P["border"])
 
 
 # =========================================================
@@ -242,20 +270,21 @@ with tab_a:
         st.write("")
 
         fig, ax = plt.subplots(figsize=(9, 5.2))
-        ax.plot(df_a["threshold"], df_a["mean_corr"], marker="o", color=TOSS_BLUE,
-                linewidth=2.5, markersize=7, markerfacecolor="white", markeredgewidth=2)
+        fig.patch.set_facecolor(P["card"])
+        ax.plot(df_a["threshold"], df_a["mean_corr"], marker="o", color=P["blue"],
+                linewidth=2.5, markersize=7, markerfacecolor=P["card"], markeredgewidth=2)
         ax.fill_between(
             df_a["threshold"],
             df_a["mean_corr"] - df_a["std_corr"],
             df_a["mean_corr"] + df_a["std_corr"],
-            color=TOSS_BLUE, alpha=0.10, label="±1 표준편차 (10개 시드)",
+            color=P["blue"], alpha=0.12, label="±1 표준편차 (10개 시드)",
         )
-        ax.axvline(x=3, color=TOSS_GRAY, linestyle="--", alpha=0.8, label="현재 정책값 (3)")
-        ax.axvline(x=best_th, color=TOSS_MINT, linestyle="--", alpha=0.9, label=f"최적값 ({best_th})")
+        ax.axvline(x=3, color=P["gray"], linestyle="--", alpha=0.8, label="현재 정책값 (3)")
+        ax.axvline(x=best_th, color=P["mint"], linestyle="--", alpha=0.9, label=f"최적값 ({best_th})")
         ax.set_xlabel("반대(disagree) 임계값")
         ax.set_ylabel("Trust Score - 실제정확도 평균 상관계수")
         style_axes(ax)
-        ax.legend(frameon=False, fontsize=10)
+        ax.legend(frameon=False, fontsize=10, labelcolor=P["text2"])
         fig.tight_layout()
 
         section_card_with_image(
@@ -317,16 +346,20 @@ with tab_b:
         pivot = df_b.pivot_table(index="location_name", columns="hour",
                                   values="avg_reported_congestion", aggfunc="mean")
         fig2, ax2 = plt.subplots(figsize=(11, 4.0))
-        im = ax2.imshow(pivot.values, cmap="YlOrRd", aspect="auto")
+        fig2.patch.set_facecolor(P["card"])
+        cmap = "YlOrRd" if not st.session_state.dark_mode else "inferno"
+        im = ax2.imshow(pivot.values, cmap=cmap, aspect="auto")
         ax2.set_xticks(range(len(pivot.columns)))
-        ax2.set_xticklabels(pivot.columns)
+        ax2.set_xticklabels(pivot.columns, color=P["text3"])
         ax2.set_yticks(range(len(pivot.index)))
-        ax2.set_yticklabels(pivot.index)
-        ax2.set_xlabel("시간대")
+        ax2.set_yticklabels(pivot.index, color=P["text3"])
+        ax2.set_xlabel("시간대", color=P["text2"])
         for spine in ax2.spines.values():
             spine.set_visible(False)
         cbar = plt.colorbar(im, ax=ax2, label="평균 혼잡도 (제보 기준)", fraction=0.025, pad=0.02)
         cbar.outline.set_visible(False)
+        cbar.ax.yaxis.label.set_color(P["text2"])
+        cbar.ax.tick_params(colors=P["text3"])
         fig2.tight_layout()
 
         section_card_with_image(
@@ -347,7 +380,9 @@ with tab_b:
             from streamlit_folium import st_folium
 
             locations = pd.read_sql("SELECT name, latitude, longitude, category FROM sim_locations", engine)
-            m = folium.Map(location=[locations["latitude"].mean(), locations["longitude"].mean()], zoom_start=16)
+            tiles = "CartoDB dark_matter" if st.session_state.dark_mode else "OpenStreetMap"
+            m = folium.Map(location=[locations["latitude"].mean(), locations["longitude"].mean()],
+                            zoom_start=16, tiles=tiles)
             for _, loc in locations.iterrows():
                 avg_c = df_b[df_b["location_name"] == loc["name"]]["avg_reported_congestion"].mean()
                 color = "red" if avg_c >= 3.5 else ("orange" if avg_c >= 2.5 else "green")
@@ -406,7 +441,7 @@ with tab_about:
 
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("""
+        st.markdown(f"""
         <div class="section-card" style="height:100%;">
             <div class="section-title">트랙 A — 신뢰도 임계값 최적화<span class="badge">Trust Score</span></div>
             <div class="section-desc" style="margin-bottom:0;">
@@ -416,7 +451,7 @@ with tab_about:
         </div>
         """, unsafe_allow_html=True)
     with col2:
-        st.markdown("""
+        st.markdown(f"""
         <div class="section-card" style="height:100%;">
             <div class="section-title">트랙 B — 시공간 혼잡도 패턴<span class="badge">혼잡도 패턴</span></div>
             <div class="section-desc" style="margin-bottom:0;">
@@ -427,7 +462,7 @@ with tab_about:
         """, unsafe_allow_html=True)
 
     st.write("")
-    st.markdown("""
+    st.markdown(f"""
     <div class="section-card">
         <div class="section-title">데이터에 대한 정직한 설명</div>
         <div class="section-desc">
@@ -437,7 +472,7 @@ with tab_about:
             정책을 재조정(recalibration)할 수 있도록 설계했습니다.
         </div>
         <a href="https://github.com/CBNU-SWCapstone-B5-TJTS-now/data-pipeline"
-           style="color:#3182F6; font-weight:600; font-size:14.5px; text-decoration:none;">
+           style="color:{P['blue']}; font-weight:600; font-size:14.5px; text-decoration:none;">
            → GitHub repository에서 전체 코드와 README 보기</a>
     </div>
     """, unsafe_allow_html=True)
