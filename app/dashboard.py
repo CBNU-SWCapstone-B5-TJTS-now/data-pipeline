@@ -58,11 +58,20 @@ html, body, [class*="css"] {
 }
 
 .stApp { background: #F2F4F6; }
-.block-container { padding-top: 2.5rem; max-width: 1180px; }
+.block-container { padding-top: 1.8rem; max-width: 1180px; }
+
+/* Streamlit 기본 상단 헤더바(햄버거 메뉴 영역)가 시스템 다크모드를 따라가면서
+   흰 배경 디자인과 충돌하는 문제 방지 — 배경을 페이지와 동일하게 맞춤 */
+header[data-testid="stHeader"] {
+    background: #F2F4F6;
+}
+header[data-testid="stHeader"] * {
+    color: #191F28 !important;
+}
 
 .eyebrow {
     font-size: 14px; font-weight: 700; color: #3182F6;
-    letter-spacing: 0.3px; margin-bottom: 6px;
+    letter-spacing: 0.3px; margin-top: 8px; margin-bottom: 8px;
 }
 .page-title {
     font-size: 30px; font-weight: 800; letter-spacing: -0.6px;
@@ -109,8 +118,9 @@ html, body, [class*="css"] {
 .stTabs [data-baseweb="tab"] {
     background: white; border-radius: 999px; padding: 10px 22px;
     font-weight: 600; font-size: 14.5px; color: #8B95A1; border: none;
-    display: flex; align-items: center; gap: 6px;
+    display: flex; align-items: center; gap: 6px; line-height: 1.3;
 }
+.stTabs [data-baseweb="tab"] p { display: flex; align-items: center; gap: 6px; margin: 0; }
 .stTabs [aria-selected="true"] { background: #191F28 !important; color: white !important; }
 
 div[data-testid="stExpander"] { border-radius: 16px; border: 1px solid #E5E8EB; background: white; }
