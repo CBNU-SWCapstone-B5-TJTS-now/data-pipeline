@@ -33,8 +33,6 @@ Nowhere는 Geofence로 현장 인증된 유저들의 동의/반대 투표를 바
 **날씨 관측 데이터** (기상청 공공데이터, cron으로 매시간 자동 수집)
 ![날씨 데이터](docs/screenshots/track_b_weather.png)
 
-> 이 프로젝트는 [Claude Code](https://claude.com/product/claude-code)를 활용하여 OCI vm-03 인프라 구축·데이터 파이프라인 구현·배포를 진행했습니다.
-
 ## 2. 아키텍처
 
 ```
