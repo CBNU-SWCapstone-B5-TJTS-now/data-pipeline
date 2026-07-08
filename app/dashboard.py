@@ -130,19 +130,28 @@ header[data-testid="stHeader"] * {{ color: {P['text1']} !important; }}
     margin-left: 6px; vertical-align: middle;
 }}
 
-.stTabs [data-baseweb="tab-list"] {{ gap: 6px; background: transparent; margin-bottom: 22px; }}
-.stTabs [data-baseweb="tab-highlight"] {{ display: none; }}
-.stTabs [data-baseweb="tab-border"] {{ display: none; }}
-.stTabs [data-baseweb="tab"] {{
-    background: {P['card']}; border-radius: 999px; padding: 10px 22px;
-    font-weight: 600; font-size: 14.5px; color: {P['text3']}; border: 1px solid {P['border']};
-    display: flex; align-items: center; gap: 6px; line-height: 1.3;
-    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+/* GNB 탭: 꽉 찬 사각형/캡슐 배경 대신 하단 밑줄 하이라이트 방식의 플랫 GNB 스타일
+   (Streamlit 최신 버전은 data-baseweb="tab" 대신 data-testid="stTab" / role="tablist"를 사용) */
+.stTabs [role="tablist"] {{
+    gap: 28px; background: transparent; margin-bottom: 26px;
+    border-bottom: 1px solid {P['border']};
 }}
-.stTabs [data-baseweb="tab"] p {{ display: flex; align-items: center; gap: 6px; margin: 0; }}
-/* 활성 탭: 라이트/다크 공통으로 브랜드 블루 사용 (다크모드에서 흑백 반전이 튀어 보이던 것 수정) */
-.stTabs [aria-selected="true"] {{
-    background: {P['blue']} !important; color: #FFFFFF !important; border-color: {P['blue']} !important;
+.stTabs [data-testid="stTab"] {{
+    background: transparent !important; border-radius: 0; padding: 10px 2px 14px 2px !important;
+    font-weight: 600; font-size: 15px; color: {P['text2']} !important; border: none !important;
+    border-bottom: 2px solid transparent !important;
+    display: flex; align-items: center; line-height: 1.3;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}}
+.stTabs [data-testid="stTab"] * {{ color: inherit !important; }}
+.stTabs [data-testid="stTab"]:hover {{ color: {P['text1']} !important; }}
+.stTabs [data-testid="stTab"] p {{
+    display: flex; align-items: center; gap: 7px; margin: 0; color: inherit;
+}}
+/* 활성 탭: 배경 없이 밝은 글자 + 브랜드 블루 밑줄만 (다크모드에서 흰 박스로 튀어 보이던 것 수정) */
+.stTabs [data-testid="stTab"][aria-selected="true"] {{
+    background: transparent !important; color: {P['text1']} !important;
+    border-bottom: 2px solid {P['blue']} !important;
 }}
 
 /* 아코디언(Expander): 헤더 배경/글자/화살표 아이콘 명도 대비 확보 (다크모드에서 텍스트가 안 보이던 문제 수정) */
@@ -272,7 +281,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-tab_a, tab_b, tab_about = st.tabs(["Trust Score 임계값", "혼잡도 패턴", "프로젝트 개요"])
+tab_a, tab_b, tab_about = st.tabs(["📊 Trust Score 임계값", "🕐 혼잡도 패턴", "📁 프로젝트 개요"])
 
 # =========================================================
 # 트랙 A
