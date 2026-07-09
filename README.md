@@ -4,6 +4,13 @@
 
 Nowhere는 사용자들이 서로의 제보를 검증하는 방식(Peer Review)으로 신뢰도를 관리합니다. 이 파이프라인은 그 검증 기준이 실제로 잘 작동하는지 데이터로 확인한 결과이며, CBNU "Cloud 기반 데이터AI 파이프라인구축" 과목 최종 평가 과제로 제작되었습니다.
 
+## Nowhere 앱 실제 데모 화면
+
+| 혼잡도 지도 | 장소 상세 | Peer Review |
+|:---:|:---:|:---:|
+| ![혼잡도 지도](docs/screenshots/congestion1.jpg) | ![장소 상세](docs/screenshots/congestion_detail.jpg) | ![Peer Review](docs/screenshots/peer_review.png) |
+| 캠퍼스 내 거점별 혼잡도가 지도에 실시간 표시됩니다 | 장소를 탭하면 현재 혼잡 상태와 동의 수, 최근 제보 이력을 확인합니다 | 근처 사용자가 제보를 검증(동의/비동의)하여 Trust Score에 반영합니다 |
+
 **배포 URL**: http://217.142.139.165 · **Notion 문서**: https://app.notion.com/p/3984a969a1c78112b7e9f70995118766
 
 ---
@@ -22,13 +29,6 @@ Nowhere는 근처의 다른 사용자들이 제보를 검증하는 **Peer Review
 - **트랙 B — 시공간 혼잡도 패턴 분석**: 장소×시간대별 혼잡도 패턴을 분석하고, 기상청 공공데이터(날씨)를 결합하여 향후 B2G(학교 행정실 대상) 리포트 제공 기반 마련
 
 ---
-
-## Nowhere 앱 실제 데모 화면
-
-| 혼잡도 지도 | 장소 상세 | Peer Review |
-|:---:|:---:|:---:|
-| ![혼잡도 지도](docs/screenshots/congestion1.jpg) | ![장소 상세](docs/screenshots/congestion_detail.jpg) | ![Peer Review](docs/screenshots/peer_review.png) |
-| 캠퍼스 내 거점별 혼잡도가 지도에 실시간 표시됩니다 | 장소를 탭하면 현재 혼잡 상태와 동의 수, 최근 제보 이력을 확인합니다 | 근처 사용자가 제보를 검증(동의/비동의)하여 Trust Score에 반영합니다 |
 
 ## 실행 화면
 
