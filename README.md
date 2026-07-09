@@ -32,23 +32,23 @@ Nowhere는 근처의 다른 사용자들이 제보를 검증하는 **Peer Review
 
 ## 실행 화면
 
-**트랙 A — Trust Score 임계값 분석**
+### **트랙 A — Trust Score 임계값 분석**
 
 ![트랙 A 대시보드](docs/screenshots/track_a_dashboard.png)
 
 반대 개수 임계값 1일 때 평균 상관계수 0.331로 가장 높게 나타났으며, 임계값이 커질수록 상관계수가 단조 감소하는 경향을 보입니다.
 
-**트랙 B — 시공간 혼잡도 패턴 분석**
+### **트랙 B — 시공간 혼잡도 패턴 분석**
 
 ![트랙 B 히트맵](docs/screenshots/track_b_dashboard.png)
 
 점심시간(12-13시), 저녁시간(18-19시) 피크가 뚜렷하게 관찰되며, 한빛식당(학식)의 혼잡도가 전반적으로 높게 나타납니다.
 
-**장소별 지도** (실제 캠퍼스 좌표 기반, folium)
+### **장소별 지도** (실제 캠퍼스 좌표 기반, folium)
 
 ![장소별 지도](docs/screenshots/track_b_map.png)
 
-**날씨 관측 데이터** (기상청 공공데이터, cron 매시간 자동 수집)
+### **날씨 관측 데이터** (기상청 공공데이터, cron 매시간 자동 수집)
 
 ![날씨 데이터](docs/screenshots/track_b_weather.png)
 
