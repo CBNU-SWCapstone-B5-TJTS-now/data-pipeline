@@ -556,10 +556,10 @@ def render_floating_chat():
 # 헤더
 # =========================================================
 st.markdown('<div class="eyebrow">NOWHERE DATA PIPELINE</div>', unsafe_allow_html=True)
-st.markdown('<div class="page-title">Trust Score, 어떤 기준이 가장 정확할까요?</div>', unsafe_allow_html=True)
+st.markdown('<div class="page-title">누구나 제보할 수 있는 실시간 혼잡도 앱, 거짓 제보는 어떻게 걸러낼까요?</div>', unsafe_allow_html=True)
 st.markdown(
-    '<div class="page-subtitle">Geofencing 기반 혼잡도 제보 시스템의 Peer Review 임계값을 '
-    '시뮬레이션 데이터로 검증하고, 시공간 혼잡도 패턴까지 함께 살펴봐요</div>',
+    '<div class="page-subtitle">Nowhere는 사용자들이 서로의 제보를 검증하는 방식(Peer Review)으로 '
+    '신뢰도를 관리해요. 이 페이지는 그 검증 기준이 실제로 잘 작동하는지 데이터로 확인한 결과예요.</div>',
     unsafe_allow_html=True,
 )
 
@@ -752,60 +752,56 @@ with tab_b:
 # 프로젝트 개요
 # =========================================================
 with tab_about:
-    st.markdown(f"""
-    <div class="section-card">
-        <div class="section-title">이 프로젝트는 무엇인가요?</div>
-        <div class="section-desc" style="margin-bottom:0;">
-            Nowhere는 CBNU SW캡스톤 졸업 프로젝트로 만든 Geofencing 기반 실시간 혼잡도 제보
-            앱이에요. 학식·도서관·카페 같은 캠퍼스 거점의 혼잡도를 사용자들이 직접 제보하고,
-            근처에 있는 다른 사용자들이 그 제보가 맞는지 검증해요. 이 검증 과정을 Peer Review라고
-            부르고, 검증 결과에 따라 제보자의 신뢰도 점수(Trust Score)가 오르내려요.
-            이 페이지는 그 Peer Review 시스템의 핵심 질문 — "반대가 몇 개 모이면 신뢰도를
-            깎아야 할까?" — 를 실제 서비스가 런칭되기 전에 시뮬레이션 데이터로 미리 검증해본
-            결과예요.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # ── 카드 1: 어떤 문제를 해결하나요? ─────────────────────────────────
+    section_text_card(
+        "어떤 문제를 해결하나요?",
+        "Nowhere는 주변 공간의 혼잡도를 사용자가 직접 제보하는 앱이에요."
+        "<br>(지금은 충북대 캠퍼스에서 시범 운영 중이지만, 캠퍼스에만 한정된 서비스는 아니에요.)"
+        "<br><br>근처의 다른 사용자들이 제보를 검증하는 Peer Review 방식을 쓰고, 검증 결과에 따라"
+        " 제보자의 신뢰도 점수(Trust Score)를 조정해요."
+        "<br><br>이 점수가 왜 중요하냐면요 — Nowhere는 신뢰도 점수가 높은 사용자의 제보에 더 큰"
+        " 영향력을 주는 가중치 알고리즘을 도입할 계획이에요. 즉 Trust Score는 한 사람의"
+        " 제보가 지도에 얼마나 강하게 반영될지를 정하는 핵심 값이 될 예정이에요."
+        "<br><br>그런데 \"반대 개수가 몇 개 모이면 신뢰도를 깎아야 하는지\" 같은 구체적인 기준은,"
+        " 서비스가 아직 런칭 전이라 실제 데이터로 검증된 적이 없었어요.",
+    )
 
-    st.markdown(f"""
-    <div class="section-card">
-        <div class="section-title">실제 서비스는 이렇게 동작해요</div>
-        <div class="section-desc" style="margin-bottom:0;">
-            <ol style="margin:0; padding-left:20px;">
-                <li>사용자 A가 혼잡도를 제보하면 지도에 바로 반영돼요</li>
-                <li>근처에 있는 사용자 B, C, D가 그 제보를 보고 "맞아요" 또는 "틀려요"로 검증해요</li>
-                <li>이 결과는 SSE(실시간 스트리밍)로 접속 중인 모든 사용자에게 즉시 전달돼요</li>
-                <li>제보 유효시간이 끝나면, 서버가 자동으로 제보자의 Trust Score를 갱신해요</li>
-            </ol>
-            <div style="margin-top:14px;">이 흐름에서 "반대가 몇 개면 감점할지"를 정하는 게 이 프로젝트가 답하려는 질문이에요.</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # ── 카드 2: 실제 서비스는 이렇게 동작해요 ───────────────────────────
+    section_text_card(
+        "실제 서비스는 이렇게 동작해요",
+        '<ol style="margin:0 0 14px 0; padding-left:20px;">'
+        "<li>사용자 A가 혼잡도를 제보하면 지도에 바로 반영돼요</li>"
+        "<li>근처에 있는 사용자 B, C, D가 그 제보를 보고 \"맞아요\" 또는 \"틀려요\"로 검증해요</li>"
+        "<li>이 결과는 SSE(실시간 스트리밍)로 접속 중인 모든 사용자에게 즉시 전달돼요</li>"
+        "<li>제보 유효시간이 끝나면, 서버가 자동으로 제보자의 Trust Score를 갱신해요</li>"
+        "</ol>"
+        "이 흐름에서 \"반대가 몇 개면 감점할지\"를 정하는 게 이 프로젝트가 답하려는 질문이에요.",
+    )
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"""
-        <div class="section-card" style="height:100%;">
-            <div class="section-title">트랙 A — 신뢰도 임계값 최적화<span class="badge">Trust Score</span></div>
-            <div class="section-desc" style="margin-bottom:0;">
-                시뮬레이션 데이터로 여러 반대 임계값을 실험해서, 어떤 값이 정확한 제보자와
-                부정확한(어뷰징) 제보자를 가장 잘 구별하는지 확인해요.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"""
-        <div class="section-card" style="height:100%;">
-            <div class="section-title">트랙 B — 시공간 혼잡도 패턴<span class="badge">혼잡도 패턴</span></div>
-            <div class="section-desc" style="margin-bottom:0;">
-                장소×시간대별 혼잡도 패턴을 분석하고 기상청 공공데이터(날씨)를 더해서,
-                앞으로 B2G(학교 행정실 대상) 리포트를 만들 수 있는 기반을 마련해요.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    # ── 카드 3: 어떻게 접근했나요? ──────────────────────────────────────
+    section_text_card(
+        "어떻게 접근했나요?",
+        "실제 백엔드 스키마와 정책을 기반으로 가상의 데이터를 만들어서 미리 검증했어요."
+        "<br><br>가상의 사용자 200명을 코드로 만들었어요. 각 유저에게 \"행동 확률\"을 심어두는데,"
+        " 예를 들어 성실한 유저는 90% 확률로 정확한 혼잡도를 제보하고, 악의적인 유저는"
+        " 20% 확률로만 정확하게 제보해요. 이 비율 자체는 우리가 설계한 값이에요"
+        " (성실 85% / 악의적 15%)."
+        "<br><br>이 가상 사용자들이 800건의 제보와 약 4,700건의 투표를 남겼다고 가정하고 분석했어요."
+        "<br>(두 데이터 출처가 다른 점: 혼잡도 데이터는 100% 가상, 날씨 데이터는 기상청"
+        " 공공데이터포털에서 실제로 수집한 데이터예요.)"
+        "<br><br>검증은 두 가지 트랙으로 나눠서 진행했어요."
+        "<br><br><b>① 신뢰도 검증 기준 분석</b> (Trust Score 임계값 탭에서 확인)<br>"
+        "\"반대가 몇 개 모이면 감점해야 정확한 사람과 부정확한 사람을 가장 잘 구별할 수"
+        " 있을까?\"를 여러 기준값(1~10)으로 실험했어요.<br>"
+        "→ 결과: 현재 정책보다 더 엄격한 기준일 때 더 잘 구별해냈어요."
+        "<br><br><b>② 혼잡도 패턴 분석</b> (혼잡도 패턴 탭에서 확인)<br>"
+        "언제 어디가 가장 붐비는지 패턴을 분석했어요. 향후 학교 시설 운영진에게"
+        " 실질적인 인사이트를 제공하는 기능의 선행 구현이에요.<br>"
+        "→ 결과: 점심시간과 저녁시간에 공통적으로 혼잡도 피크가 나타났어요.",
+    )
 
+    # ── 카드 4: 어떻게 만들었나요 (기존 유지) ───────────────────────────
     st.write("")
-
     diagram_path = "docs/workflow_diagram.png"
     diagram_html = (
         f'<img src="data:image/png;base64,{file_to_base64(diagram_path)}">'
@@ -824,25 +820,32 @@ with tab_about:
     </div>
     """, unsafe_allow_html=True)
 
+    # ── 카드 5: 데이터, 솔직하게 말씀드릴게요 ───────────────────────────
     st.write("")
     st.markdown(f"""
     <div class="section-card">
         <div class="section-title">데이터, 솔직하게 말씀드릴게요</div>
         <div class="section-desc">
-            이 대시보드의 모든 수치는 <b>합성(시뮬레이션) 데이터</b>를 기준으로 해요. 서비스가 아직
-            런칭 전이라 실사용자 데이터가 없는 콜드스타트 상황이라, 실제 백엔드와 똑같은 스키마와
-            정책을 반영해서 만들었어요. 서비스가 런칭되면 같은 파이프라인에 실데이터를 흘려보내서
-            정책을 다시 검증(재조정)할 수 있게 설계해뒀어요.<br><br>
+            이 대시보드의 모든 혼잡도 수치는 <b>합성(시뮬레이션) 데이터</b>를 기준으로 해요.
+            서비스가 런칭되면 같은 파이프라인에 실데이터를 흘려보내서 정책을 다시 검증할
+            예정이에요.<br><br>
             실제 서비스의 혼잡도는 LOW/MEDIUM/HIGH 3단계로 표현되는데, 이 시뮬레이션은
-            통계 분석 편의를 위해 이 3단계를 그대로 순서형 점수로 다뤘어요.<br>
+            통계 분석 편의를 위해 이 3단계를 순서형 점수로 다뤘어요.<br>
             Trust Score의 기본점수(50)와 동의 반영(+1) 규칙은 현재 배포된 코드가 아니라
             팀이 다음 단계로 검토 중인 확장 설계를 기준으로 시뮬레이션했어요.
         </div>
-        <a href="https://github.com/CBNU-SWCapstone-B5-TJTS-now/data-pipeline" target="_blank"
-           style="display:inline-block; margin-top:6px; padding:11px 22px; background:{P['blue']};
-                  color:#FFFFFF; font-weight:700; font-size:14.5px; border-radius:12px;
-                  text-decoration:none;">
-           GitHub Repository 방문하기</a>
+        <div style="display:flex; gap:12px; margin-top:6px; flex-wrap:wrap;">
+            <a href="https://github.com/CBNU-SWCapstone-B5-TJTS-now/data-pipeline" target="_blank"
+               style="display:inline-block; padding:11px 22px; background:{P['blue']};
+                      color:#FFFFFF; font-weight:700; font-size:14.5px; border-radius:12px;
+                      text-decoration:none;">
+               GitHub Repository 방문하기</a>
+            <a href="https://app.notion.com/p/3984a969a1c78112b7e9f70995118766" target="_blank"
+               style="display:inline-block; padding:11px 22px; background:{P['blue']};
+                      color:#FFFFFF; font-weight:700; font-size:14.5px; border-radius:12px;
+                      text-decoration:none;">
+               Notion 문서 보기</a>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
