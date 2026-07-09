@@ -338,12 +338,12 @@ def style_axes(ax):
 QA_SYSTEM_PROMPT = """당신은 "Nowhere Data Pipeline" 대시보드에 내장된 안내 도우미입니다.
 이 프로젝트를 처음 접하는 평가자, 교수님, 발표 관람자의 질문에
 아래에 제공된 사실만을 근거로, '-입니다'체를 사용하여 답변하십시오.
-발표자가 청중에게 차분하게 설명하는 톤으로, 3~5문장 이내로 간결하고 명료하게 답변하십시오.
+발표자가 청중에게 차분하게 설명하는 톤으로 답변하십시오.
 
 [반드시 지켜야 할 형식 규칙]
 - 마크다운 헤딩(#, ##, ###)은 절대 사용하지 마십시오.
-- 번호 매기기나 불릿 목록도 최대한 자제하고 자연스러운 서술형 문단으로 작성하십시오.
-- 짧고 핵심만 담은 답변이 길고 구조화된 답변보다 낫습니다.
+- 마크다운을 적극 활용하십시오. 나열할 항목이 3개 이상이면 리스트(-, 1.)로 정리하고, 핵심 키워드나 수치는 **볼드**로 강조하십시오.
+- 문단은 2~3문장 이내로 짧게 끊으십시오.
 - 인사말("안녕하세요" 등)로 시작하지 말고 바로 질문에 답변하십시오.
 
 아래에 명시되지 않은 내용은 추측하지 말고
@@ -409,6 +409,10 @@ def _md_to_html(text: str) -> str:
     text = re.sub(r'^### (.+)$', rf'<span style="{_h}font-size:13px">\1</span>', text, flags=re.MULTILINE)
     text = re.sub(r'^## (.+)$',  rf'<span style="{_h}font-size:13.5px">\1</span>', text, flags=re.MULTILINE)
     text = re.sub(r'^# (.+)$',   rf'<span style="{_h}font-size:14px">\1</span>',   text, flags=re.MULTILINE)
+    # 리스트 아이템 (-/* unordered, 1. ordered) — 줄바꿈 변환 전에 처리
+    _li = 'display:block;padding-left:14px;text-indent:-10px;margin:1px 0;'
+    text = re.sub(r'^[-*] (.+)$', rf'<span style="{_li}">&#8226;&ensp;\1</span>', text, flags=re.MULTILINE)
+    text = re.sub(r'^(\d+)\. (.+)$', rf'<span style="{_li}">\1.&ensp;\2</span>', text, flags=re.MULTILINE)
     # 인라인 서식
     text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', text, flags=re.DOTALL)
     text = re.sub(r'\*((?!\s)[^*]+(?<!\s))\*', r'<em>\1</em>', text)
@@ -467,7 +471,7 @@ def render_floating_chat():
             st.markdown(
                 '<div style="padding:6px 20px 8px;font-size:12.5px;color:#8B95A1;line-height:1.8;">'
                 "예시 질문:<br>"
-                "· 이 프로젝트 전체를 처음부터 설명해줘<br>"
+                "· Nowhere가 무슨 프로젝트인가요?<br>"
                 "· 트랙 A 결과가 무슨 의미인가요?<br>"
                 "· 어떤 기술 스택을 사용했나요?"
                 "</div>",
