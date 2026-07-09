@@ -286,7 +286,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-tab_a, tab_b, tab_about = st.tabs(["📊 Trust Score 임계값", "🕐 혼잡도 패턴", "📁 프로젝트 개요"])
+tab_about, tab_a, tab_b = st.tabs(["📁 프로젝트 개요", "📊 Trust Score 임계값", "🕐 혼잡도 패턴"])
 
 # =========================================================
 # 트랙 A
