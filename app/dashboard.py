@@ -478,11 +478,14 @@ def render_floating_chat():
                 unsafe_allow_html=True,
             )
 
-        # flex-direction:column-reverse 로 최신 메시지가 항상 하단에 보이게 함
-        # Python 이터레이션을 reversed()로 뒤집어야 시각적 순서(위=오래된, 아래=최신)가 맞음
+        # flex-direction:column-reverse 로 최신 Q&A 쌍이 항상 하단에 보이게 함.
+        # 각 쌍을 <div>로 래핑해야 column-reverse가 쌍 간 순서만 역전시키고
+        # 쌍 내부(user→bot)의 순서는 그대로 유지된다.
         history_html = "".join(
-            _BUBBLE_USER.format(content=html.escape(item["q"]))
+            '<div>'
+            + _BUBBLE_USER.format(content=html.escape(item["q"]))
             + _BUBBLE_BOT.format(content=_md_to_html(item["a"]))
+            + '</div>'
             for item in reversed(st.session_state.qa_history)
         )
         if history_html:
