@@ -14,11 +14,16 @@ Nowhere Data Pipeline - Streamlit 대시보드 (Toss 스타일 리포트형 UI, 
 """
 import os
 import io
+import html
 import base64
 import streamlit as st
 import pandas as pd
+import anthropic
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 import matplotlib.pyplot as plt
+
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env"))
 
 plt.rcParams["font.family"] = "Noto Sans CJK KR"
 plt.rcParams["axes.unicode_minus"] = False
@@ -54,19 +59,21 @@ LIGHT = dict(
     bg="#F2F4F6", card="#FFFFFF", text1="#191F28", text2="#4E5968", text3="#8B95A1",
     border="#E5E8EB", blue="#3182F6", blue_dark="#1B64DA", mint="#05A88E", gray="#B0B8C1",
     badge_bg="#E8F3FF", shadow="rgba(0,0,0,0.04)", header_bg="#F2F4F6",
-    info_bg="#E8F3FF", info_text="#1B64DA", mint_rgb="5,168,142",
+    info_bg="#E8F3FF", info_text="#1B64DA", mint_rgb="5,168,142", blue_rgb="49,130,246",
 )
 DARK = dict(
     bg="#101216", card="#1C1F26", text1="#F2F4F6", text2="#B0B8C1", text3="#7C8592",
     border="#2B2F38", blue="#5B9DFF", blue_dark="#3182F6", mint="#2FE1C4", gray="#545B66",
     badge_bg="#1A2C4A", shadow="rgba(0,0,0,0.35)", header_bg="#101216",
-    info_bg="#1A2C4A", info_text="#EAF2FF", mint_rgb="47,225,196",
+    info_bg="#1A2C4A", info_text="#EAF2FF", mint_rgb="47,225,196", blue_rgb="91,157,255",
 )
 
 if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = False
 
 P = DARK if st.session_state.dark_mode else LIGHT
+# 메인 타이틀: 다크모드에서는 화이트 계열로, 라이트모드에서는 기존 진한 텍스트 톤 유지
+title_color = "#FFFFFF" if st.session_state.dark_mode else P["text1"]
 
 # =========================================================
 # 전역 CSS 주입 (팔레트 변수 반영)
@@ -80,10 +87,12 @@ html, body, [class*="css"] {{
 }}
 
 .stApp {{ background: {P['bg']}; }}
-.block-container {{ padding-top: 1.8rem; max-width: 1180px; }}
+.block-container {{ padding-top: 2.2rem; max-width: 1180px; }}
 
-header[data-testid="stHeader"] {{ background: {P['header_bg']}; }}
-header[data-testid="stHeader"] * {{ color: {P['text1']} !important; }}
+/* Streamlit 기본 상단바(햄버거 메뉴/Deploy 버튼 등, [data-testid="stToolbar"]를 담고 있는 요소)
+   완전히 숨김 — 개발자도구로 실제 selector(header[data-testid="stHeader"]) 확인 후 적용.
+   .streamlit/config.toml의 toolbarMode="minimal"과 이중 안전장치. */
+header[data-testid="stHeader"] {{ display: none !important; }}
 
 .eyebrow {{
     font-size: 14px; font-weight: 700; color: {P['blue']};
@@ -91,7 +100,7 @@ header[data-testid="stHeader"] * {{ color: {P['text1']} !important; }}
 }}
 .page-title {{
     font-size: 30px; font-weight: 800; letter-spacing: -0.6px;
-    color: {P['text1']}; margin-bottom: 4px; line-height: 1.35;
+    color: {title_color}; margin-bottom: 4px; line-height: 1.35;
 }}
 .page-subtitle {{ font-size: 15.5px; color: {P['text2']}; margin-bottom: 28px; }}
 
@@ -148,10 +157,11 @@ header[data-testid="stHeader"] * {{ color: {P['text1']} !important; }}
 .stTabs [data-testid="stTab"] p {{
     display: flex; align-items: center; gap: 7px; margin: 0; color: inherit;
 }}
-/* 활성 탭: 배경 없이 밝은 글자 + 브랜드 블루 밑줄만 (다크모드에서 흰 박스로 튀어 보이던 것 수정) */
+/* 활성 탭: 배경 없이 밝은 글자 + 톤다운된 블루 밑줄만 (다크모드에서 흰 박스로 튀어 보이던 것 수정,
+   원색 그대로면 너무 튀어서 opacity를 낮춰 톤다운) */
 .stTabs [data-testid="stTab"][aria-selected="true"] {{
     background: transparent !important; color: {P['text1']} !important;
-    border-bottom: 2px solid {P['blue']} !important;
+    border-bottom: 2px solid rgba({P['blue_rgb']}, 0.55) !important;
 }}
 
 /* 아코디언(Expander): 헤더 배경/글자/화살표 아이콘 명도 대비 확보 (다크모드에서 텍스트가 안 보이던 문제 수정) */
@@ -186,14 +196,36 @@ div[data-testid="stAlert"] svg {{ color: {P['info_text']} !important; fill: {P['
     box-shadow: 0 0 0 3px rgba({P['mint_rgb']}, 0.12);
 }}
 
-/* 라이트/다크 토글 버튼 (앱 전체에서 유일한 st.button) */
-div[data-testid="stButton"] {{
+/* 플로팅 채팅 토글 버튼: 화면 우측 하단 상시 고정 (제일 아래) */
+.st-key-chat_toggle_btn {{
     position: fixed; bottom: 28px; right: 28px; z-index: 9999; width: auto;
 }}
-div[data-testid="stButton"] button {{
-    border-radius: 50%; width: 52px; height: 52px; padding: 0;
-    background: {P['card']}; border: 1px solid {P['border']};
-    box-shadow: 0 4px 14px {P['shadow']}; font-size: 20px;
+.st-key-chat_toggle_btn button {{
+    border-radius: 50%; width: 50px; height: 50px; padding: 0;
+    background: #FFFFFF; border: 1.5px solid {P['border']}; color: {P['blue']};
+    box-shadow: 0 6px 18px rgba(0,0,0,0.18); font-size: 21px;
+}}
+
+/* 라이트/다크 토글 버튼: 채팅 버튼 바로 위에 쌓아서 배치 */
+.st-key-theme_toggle_btn {{
+    position: fixed; bottom: 90px; right: 28px; z-index: 9999; width: auto;
+}}
+.st-key-theme_toggle_btn button {{
+    border-radius: 50%; width: 50px; height: 50px; padding: 0;
+    background: #FFFFFF; border: 1.5px solid {P['border']}; color: {P['blue']};
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15); font-size: 21px;
+}}
+
+/* 플로팅 채팅 미니 팝업 카드: 두 버튼 위쪽, 다크 톤 카드 */
+.st-key-chat_popup_container {{
+    position: fixed !important; bottom: 156px; right: 28px; z-index: 9998;
+    width: 360px; max-height: 60vh; overflow-y: auto;
+    background: {P['card']} !important; border: 1px solid {P['border']} !important;
+    border-radius: 18px !important; box-shadow: 0 16px 40px rgba(0,0,0,0.35) !important;
+    padding: 20px !important;
+}}
+@media (max-width: 480px) {{
+    .st-key-chat_popup_container {{ width: calc(100vw - 40px); right: 20px; }}
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -203,8 +235,12 @@ def toggle_theme():
     st.session_state.dark_mode = not st.session_state.dark_mode
 
 
-st.button("🌙" if not st.session_state.dark_mode else "☀️", on_click=toggle_theme,
-          help="라이트/다크 모드 전환")
+def toggle_chat():
+    st.session_state.chat_open = not st.session_state.chat_open
+
+
+if "chat_open" not in st.session_state:
+    st.session_state.chat_open = False
 
 
 def fig_to_base64(fig) -> str:
@@ -273,6 +309,133 @@ def style_axes(ax):
     ax.xaxis.label.set_color(P["text2"])
     ax.yaxis.label.set_color(P["text2"])
     ax.grid(alpha=0.25, color=P["border"])
+
+
+# =========================================================
+# 프로젝트 개요 탭 하단 Q&A 위젯용 시스템 프롬프트 (Claude Haiku)
+# =========================================================
+QA_SYSTEM_PROMPT = """당신은 "Nowhere Data Pipeline" 대시보드에 내장된 안내 도우미입니다.
+이 프로젝트를 처음 보는 사람(교수님, 평가자 등)의 질문에 아래 사실만 근거로,
+친근한 "-해요"체로 2~4문장 정도로 간결하게 답변하세요. 아래에 없는 내용은
+추측하지 말고 "이 부분은 제가 정확히 알지 못해요, README나 보고서를 참고해주세요"
+라고 답하세요.
+
+## 프로젝트 개요
+Nowhere는 CBNU SW캡스톤 졸업 프로젝트로 만든 Geofencing 기반 실시간 혼잡도 제보
+앱이다. 학식·도서관·카페 같은 캠퍼스 거점의 혼잡도를 사용자가 제보하면, 근처의
+다른 사용자들이 "맞아요/틀려요"로 검증한다(Peer Review). 이 검증 결과에 따라
+제보자의 신뢰도 점수(Trust Score)가 조정된다.
+
+## 이 파이프라인이 존재하는 이유
+서비스가 아직 런칭 전이라 실사용자 데이터가 없다. Trust Score의 반대 임계값을
+얼마로 정해야 합리적인지 검증할 데이터가 없었기 때문에, 실제 백엔드 스키마와
+정책을 기반으로 시뮬레이션 데이터를 만들어 미리 검증했다.
+
+## 실제 서비스 동작 흐름
+1. 사용자 A가 혼잡도를 제보하면 지도에 즉시 반영된다
+2. 근처의 사용자 B, C, D가 그 제보를 검증한다 (맞아요/틀려요)
+3. 검증 결과는 SSE(실시간 스트리밍)로 접속 중인 모든 사용자에게 전달된다
+4. 제보 유효시간이 끝나면 서버가 배치로 제보자의 Trust Score를 자동 갱신한다
+
+## 트랙 A - Trust Score 임계값 분석
+- 질문: "반대가 몇 개 모이면 신뢰도를 깎아야 할까?"
+- 방법: 시뮬레이션 데이터로 반대 임계값을 1~10까지 바꿔가며, Trust Score가
+  유저의 실제 정확도(true_accuracy, 숨겨진 정답값)와 얼마나 상관관계가 있는지 검증
+- 결과: 임계값 1이 10회 반복 시뮬레이션에서 항상 1등이었다 (현재 정책값인 3보다
+  실제 정확도를 더 잘 구별함)
+- Trust Score 설계: 기본점수 50, 만점 100, 동의 1개당 +1, 반대 3개까지는 무사,
+  초과분마다 -1 (이는 팀이 검토 중인 확장 설계이며, 현재 배포된 코드의 정책과는
+  다를 수 있음 - 현재 배포 코드는 기본값 0, 동의 미반영, 반대 3개 이상이면
+  flat -1)
+
+## 트랙 B - 시공간 혼잡도 패턴 분석
+- 방법: 장소×시간대별 혼잡도 패턴을 PostGIS 공간 쿼리로 분석하고, 기상청
+  공공데이터(날씨)를 결합
+- 혼잡도는 실제 서비스와 동일하게 LOW/MEDIUM/HIGH 3단계 카테고리로 표현
+- 결과: 점심시간(12-13시)과 저녁시간(18-19시)에 전체 장소에서 공통적으로 혼잡도가
+  높아지는 패턴이 뚜렷하게 관찰됨. 한빛식당(학식)의 혼잡도가 전반적으로 높음
+- 날씨 데이터는 기상청 공공데이터포털 API로 매시간 자동 수집(cron)하지만, 혼잡도
+  데이터가 합성(시뮬레이션)이라 날씨와의 실질적 상관관계 분석은 아직 하지 않음
+
+## 인프라
+OCI vm-03(Oracle Linux 8, 2 OCPU/16GB) 위에 PostgreSQL 16 + PostGIS로 데이터를
+저장하고, Python으로 시뮬레이션 데이터를 생성·분석했다. Streamlit으로 대시보드를
+만들고 nginx 리버스 프록시로 외부에 공개했다. Object Storage에 원본 데이터를
+백업한다.
+
+## 데이터에 대한 중요한 한계
+모든 수치는 합성(시뮬레이션) 데이터 기준이며 실사용자 데이터가 아니다. 서비스
+런칭 후 같은 파이프라인에 실데이터를 흘려보내 정책을 재조정할 계획이다.
+
+## 관련 링크
+GitHub: https://github.com/CBNU-SWCapstone-B5-TJTS-now/data-pipeline
+"""
+
+
+def ask_claude(question: str):
+    """Claude Haiku에 질문을 보내고 session_state에 답변/에러를 저장"""
+    st.session_state["qa_answer"] = None
+    st.session_state["qa_error"] = None
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        st.session_state["qa_error"] = "ANTHROPIC_API_KEY가 설정되어 있지 않아요. .env 파일을 확인해주세요."
+        return
+    try:
+        with st.spinner("답변을 생각하고 있어요..."):
+            client = anthropic.Anthropic(api_key=api_key)
+            resp = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=300,
+                system=QA_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": question}],
+            )
+            st.session_state["qa_answer"] = resp.content[0].text
+    except Exception as e:
+        st.session_state["qa_error"] = f"답변을 가져오는 중 문제가 생겼어요: {e}"
+
+
+def render_floating_chat():
+    """화면 우측 하단 상시 고정 채팅 토글 버튼 + 클릭 시 열리는 미니 팝업 카드.
+    with tab_x: 블록 밖(페이지 전역)에서 호출해야 탭을 바꿔도 계속 보인다."""
+    st.button("💬", on_click=toggle_chat, help="이 프로젝트에 대해 물어보기", key="chat_toggle_btn")
+
+    if not st.session_state.chat_open:
+        return
+
+    with st.container(key="chat_popup_container"):
+        st.markdown(f"""
+        <div style="font-weight:700; font-size:15.5px; color:{P['text1']}; margin-bottom:4px;">
+            💬 이 프로젝트에 대해 물어보세요
+        </div>
+        <div style="font-size:12.5px; color:{P['text3']}; margin-bottom:14px; line-height:1.5;">
+            Claude(Anthropic)가 이 대시보드 내용을 바탕으로 답변해드려요.
+        </div>
+        """, unsafe_allow_html=True)
+
+        question = st.text_input(
+            "질문", key="qa_question", label_visibility="collapsed",
+            placeholder="예: 트랙 A 결과가 무슨 의미인가요?",
+        )
+        ask = st.button("물어보기", use_container_width=True, key="qa_ask_btn")
+
+        if ask and question.strip():
+            ask_claude(question)
+
+        if st.session_state.get("qa_error"):
+            st.markdown(f"""
+            <div style="margin-top:12px; padding-top:12px; border-top:1px solid {P['border']};
+                        font-size:13.5px; color:{P['text2']}; line-height:1.6;">
+                ⚠️ {html.escape(st.session_state["qa_error"])}
+            </div>
+            """, unsafe_allow_html=True)
+        elif st.session_state.get("qa_answer"):
+            answer_html = html.escape(st.session_state["qa_answer"]).replace("\n", "<br>")
+            st.markdown(f"""
+            <div style="margin-top:12px; padding-top:12px; border-top:1px solid {P['border']};
+                        font-size:13.5px; color:{P['text2']}; line-height:1.7;">
+                {answer_html}
+            </div>
+            """, unsafe_allow_html=True)
 
 
 # =========================================================
@@ -569,33 +732,41 @@ with tab_about:
     </div>
     """, unsafe_allow_html=True)
 
-    # ---- 푸터: 데이터 출처 / 기술 스택 ----
-    footer_bg = P["text1"] if not st.session_state.dark_mode else P["card"]
-    footer_text = P["bg"] if not st.session_state.dark_mode else P["text1"]
-    footer_label = P["text3"] if not st.session_state.dark_mode else P["text2"]
-
-    st.write("")
-    st.markdown(f"""
-    <div style="background:{footer_bg}; border-radius:20px; padding:36px 40px;">
-        <div style="display:flex; gap:48px; flex-wrap:wrap;">
-            <div style="flex:1; min-width:220px;">
-                <div style="font-size:13.5px; font-weight:700; color:{footer_label}; margin-bottom:12px; letter-spacing:0.3px;">데이터 출처</div>
-                <div style="color:{footer_text}; font-size:14.5px; line-height:2;">
-                    기상청 공공데이터포털 — 초단기실황 조회 API<br>
-                    시뮬레이션 데이터 (실제 백엔드 스키마 기반 합성 생성)
-                </div>
-            </div>
-            <div style="flex:1; min-width:220px;">
-                <div style="font-size:13.5px; font-weight:700; color:{footer_label}; margin-bottom:12px; letter-spacing:0.3px;">기술 스택</div>
-                <div style="color:{footer_text}; font-size:14.5px; line-height:2;">
-                    수집·처리 — Python, pandas, requests<br>
-                    저장 — PostgreSQL 16 + PostGIS, OCI Block Volume, Object Storage<br>
-                    시각화 — Streamlit, matplotlib, folium
-                </div>
+# =========================================================
+# 페이지 전역 푸터: 데이터 출처 / 기술 스택
+# (탭 안이 아니라 st.tabs() 밖에서 호출 — 어느 탭에 있든 페이지 맨 아래에 항상 보이게)
+# 짙은 박스 배경 없이 본문 배경 위에 투명하게 얹고, 구분선만으로 영역을 나눔
+# =========================================================
+st.write("")
+st.markdown(f"""
+<div style="border-top: 1px solid {P['border']}; margin-top: 8px; padding-top: 28px;">
+    <div style="display:flex; gap:48px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:220px;">
+            <div style="font-size:13.5px; font-weight:700; color:{P['text1']}; margin-bottom:12px; letter-spacing:0.3px;">🌐 데이터 출처</div>
+            <div style="color:{P['text2']}; font-size:14.5px; line-height:2;">
+                기상청 공공데이터포털 — 초단기실황 조회 API<br>
+                시뮬레이션 데이터 (실제 백엔드 스키마 기반 합성 생성)
             </div>
         </div>
-        <div style="text-align:center; font-size:12.5px; color:{footer_label}; margin-top:32px; padding-top:20px; border-top:1px solid {P['border']};">
-            충북대학교 소프트웨어학과 · Cloud 기반 데이터AI 파이프라인구축 · 2026
+        <div style="flex:1; min-width:220px;">
+            <div style="font-size:13.5px; font-weight:700; color:{P['text1']}; margin-bottom:12px; letter-spacing:0.3px;">🛠️ 기술 스택</div>
+            <div style="color:{P['text2']}; font-size:14.5px; line-height:2;">
+                수집·처리 — Python, pandas, requests<br>
+                저장 — PostgreSQL 16 + PostGIS, OCI Block Volume, Object Storage<br>
+                시각화 — Streamlit, matplotlib, folium
+            </div>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    <div style="text-align:center; font-size:12.5px; color:{P['text3']}; margin-top:28px; padding: 16px 0 24px;">
+        충북대학교 소프트웨어학과 · Cloud 기반 데이터AI 파이프라인구축 · 2026
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# =========================================================
+# 라이트/다크 토글 + 플로팅 채팅 위젯
+# (둘 다 탭 밖에서 호출 — 어느 탭에 있든 항상 우측 하단에 고정, 토글 버튼이 채팅 버튼 위에 쌓임)
+# =========================================================
+st.button("🌙" if not st.session_state.dark_mode else "☀️", on_click=toggle_theme,
+          help="라이트/다크 모드 전환", key="theme_toggle_btn")
+render_floating_chat()
