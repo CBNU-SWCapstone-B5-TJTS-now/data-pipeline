@@ -14,6 +14,7 @@ Nowhere Data Pipeline - Streamlit 대시보드 (Toss 스타일 리포트형 UI, 
 """
 import os
 import io
+import re
 import html
 import base64
 import streamlit as st
@@ -216,10 +217,11 @@ div[data-testid="stAlert"] svg {{ color: {P['info_text']} !important; fill: {P['
     box-shadow: 0 4px 14px rgba(0,0,0,0.15); font-size: 21px;
 }}
 
-/* 플로팅 채팅 패널: 흰 배경 + 회색 말풍선 채팅 버블 */
+/* 플로팅 채팅 패널: 흰 배경 + 카카오톡 스타일 말풍선 */
 .st-key-chat_popup_container {{
     position: fixed !important; bottom: 152px; right: 28px; z-index: 9998;
-    width: 380px; background: #FFFFFF !important;
+    width: 420px; max-height: 700px;
+    background: #FFFFFF !important;
     border: 1px solid #E5E8EB !important; border-radius: 20px !important;
     box-shadow: 0 8px 32px rgba(0,0,0,0.16) !important;
     overflow: hidden !important; padding: 0 !important;
@@ -332,10 +334,11 @@ def style_axes(ax):
 # 프로젝트 개요 탭 하단 Q&A 위젯용 시스템 프롬프트 (Claude Haiku)
 # =========================================================
 QA_SYSTEM_PROMPT = """당신은 "Nowhere Data Pipeline" 대시보드에 내장된 안내 도우미입니다.
-이 프로젝트를 처음 보는 사람(교수님, 평가자 등)의 질문에 아래 사실만 근거로,
-친근한 "-해요"체로 2~4문장 정도로 간결하게 답변하세요. 아래에 없는 내용은
-추측하지 말고 "이 부분은 제가 정확히 알지 못해요, README나 보고서를 참고해주세요"
-라고 답하세요.
+이 프로젝트를 처음 접하는 평가자, 교수님, 발표 관람자의 질문에
+아래에 제공된 사실만을 근거로, '-입니다'체를 사용하여 답변하십시오.
+발표자가 청중에게 차분하게 설명하는 톤으로, 3~5문장으로 간결하고 명료하게 답변하십시오.
+아래에 명시되지 않은 내용은 추측하지 말고
+"이 부분은 정확한 내용을 파악하기 어렵습니다. README나 보고서를 참고해 주십시오."라고 말씀드리십시오.
 
 ## 프로젝트 개요
 Nowhere는 CBNU SW캡스톤 졸업 프로젝트로 만든 Geofencing 기반 실시간 혼잡도 제보
@@ -389,26 +392,40 @@ GitHub: https://github.com/CBNU-SWCapstone-B5-TJTS-now/data-pipeline
 """
 
 
-def ask_claude_and_save(question: str):
-    """Claude Haiku에 질문하고 결과를 qa_history 리스트에 추가"""
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        st.session_state.qa_history.append({
-            "q": question,
-            "a": "⚠️ ANTHROPIC_API_KEY가 설정되어 있지 않아요. .env 파일을 확인해주세요.",
-        })
-        return
-    try:
-        client = anthropic.Anthropic(api_key=api_key)
-        resp = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=300,
-            system=QA_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": question}],
-        )
-        st.session_state.qa_history.append({"q": question, "a": resp.content[0].text})
-    except Exception as e:
-        st.session_state.qa_history.append({"q": question, "a": f"⚠️ 답변을 가져오는 중 문제가 생겼어요: {e}"})
+def _md_to_html(text: str) -> str:
+    """Claude 응답의 마크다운을 HTML로 변환 (헤딩·굵게·기울임·취소선·코드·줄바꿈)"""
+    text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    # 헤딩 — 줄바꿈 변환 전에 처리해야 ^ $ 앵커가 정상 작동함
+    _h = 'font-weight:700;display:block;margin:6px 0 2px;'
+    text = re.sub(r'^### (.+)$', rf'<span style="{_h}font-size:13px">\1</span>', text, flags=re.MULTILINE)
+    text = re.sub(r'^## (.+)$',  rf'<span style="{_h}font-size:13.5px">\1</span>', text, flags=re.MULTILINE)
+    text = re.sub(r'^# (.+)$',   rf'<span style="{_h}font-size:14px">\1</span>',   text, flags=re.MULTILINE)
+    # 인라인 서식
+    text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', text, flags=re.DOTALL)
+    text = re.sub(r'\*((?!\s)[^*]+(?<!\s))\*', r'<em>\1</em>', text)
+    text = re.sub(r'~~(.*?)~~', r'<del>\1</del>', text)
+    text = re.sub(
+        r'`([^`]+)`',
+        r'<code style="background:#F2F4F6;padding:1px 5px;border-radius:4px;font-size:12px">\1</code>',
+        text,
+    )
+    text = text.replace("\n\n", '<br><br>').replace("\n", '<br>')
+    return text
+
+
+# ── 말풍선 HTML 스니펫 ────────────────────────────────────────────────
+_BUBBLE_USER = (
+    '<div style="display:flex;justify-content:flex-end;padding:3px 16px 3px;">'
+    '<div style="background:#DCF8C6;border-radius:18px 4px 18px 18px;'
+    'padding:10px 14px;max-width:78%;font-size:13.5px;color:#191F28;line-height:1.6;">'
+    '{content}</div></div>'
+)
+_BUBBLE_BOT = (
+    '<div style="display:flex;justify-content:flex-start;padding:3px 16px 3px;">'
+    '<div style="background:#F2F4F6;border:1px solid #E5E8EB;border-radius:4px 18px 18px 18px;'
+    'padding:10px 14px;max-width:78%;font-size:13.5px;color:#4E5968;line-height:1.7;">'
+    '{content}</div></div>'
+)
 
 
 def render_floating_chat():
@@ -420,7 +437,7 @@ def render_floating_chat():
         return
 
     with st.container(key="chat_popup_container"):
-        # ── 헤더: 제목 + 닫기(✕) 버튼 ───────────────────────────────
+        # ── 헤더: 제목 + 닫기(✕) 버튼 ──────────────────────────────
         col_title, col_close = st.columns([6, 1])
         with col_title:
             st.markdown("""
@@ -429,53 +446,85 @@ def render_floating_chat():
                     💬 이 프로젝트에 대해 물어보세요
                 </div>
                 <div style="font-size:12px; color:#8B95A1; margin-top:3px;">
-                    Claude(Anthropic)가 이 대시보드 내용을 바탕으로 답변해드려요.
+                    Claude(Anthropic)가 이 대시보드 내용을 바탕으로 답변해드립니다.
                 </div>
             </div>
             """, unsafe_allow_html=True)
         with col_close:
             st.button("✕", on_click=toggle_chat, key="chat_close_btn")
 
-        # ── 히스토리 또는 힌트 텍스트 ────────────────────────────────
-        if st.session_state.qa_history:
-            history_parts = []
-            for item in st.session_state.qa_history:
-                q_esc = html.escape(item["q"])
-                a_html = html.escape(item["a"]).replace("\n", "<br>")
-                history_parts.append(f"""
-                <div style="background:#E5E8EB; border-radius:12px 12px 12px 3px;
-                            padding:10px 14px; margin-bottom:6px;
-                            font-size:13.5px; color:#191F28; line-height:1.6;">
-                    {q_esc}
-                </div>
-                <div style="background:#F8F9FA; border:1px solid #E5E8EB;
-                            border-radius:3px 12px 12px 12px;
-                            padding:10px 14px; margin-bottom:12px;
-                            font-size:13.5px; color:#4E5968; line-height:1.7;">
-                    {a_html}
-                </div>
-                """)
+        # ── 대화 이력 (카카오톡 스타일 말풍선) ──────────────────────
+        if not st.session_state.qa_history:
             st.markdown(
-                '<div style="max-height:220px; overflow-y:auto; padding:4px 20px 4px;">'
-                + "".join(history_parts)
-                + "</div>",
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                '<div style="padding:4px 20px 8px; font-size:12.5px; color:#8B95A1; line-height:1.7;">'
+                '<div style="padding:6px 20px 8px;font-size:12.5px;color:#8B95A1;line-height:1.8;">'
                 "예시 질문:<br>"
+                "· 이 프로젝트 전체를 처음부터 설명해줘<br>"
                 "· 트랙 A 결과가 무슨 의미인가요?<br>"
-                "· 이 데이터는 실제 데이터인가요?<br>"
                 "· 어떤 기술 스택을 사용했나요?"
                 "</div>",
                 unsafe_allow_html=True,
             )
 
-        # ── 입력창 (st.chat_input — 컨테이너 안에 정상 렌더링 확인됨) ──
+        history_html = "".join(
+            _BUBBLE_USER.format(content=html.escape(item["q"]))
+            + _BUBBLE_BOT.format(content=_md_to_html(item["a"]))
+            for item in st.session_state.qa_history
+        )
+        if history_html:
+            st.markdown(
+                f'<div style="max-height:450px;overflow-y:auto;padding:4px 0;">{history_html}</div>',
+                unsafe_allow_html=True,
+            )
+
+        # ── 입력 + 스트리밍 응답 ─────────────────────────────────────
         if question := st.chat_input("질문을 입력하세요...", key="chat_main_input"):
-            with st.spinner("생각하고 있어요..."):
-                ask_claude_and_save(question)
+            # 사용자 말풍선 즉시 표시
+            st.markdown(
+                _BUBBLE_USER.format(content=html.escape(question)),
+                unsafe_allow_html=True,
+            )
+
+            # 스트리밍 응답 말풍선 (st.empty로 실시간 업데이트)
+            stream_slot = st.empty()
+            full_text = ""
+            api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+
+            if not api_key:
+                full_text = "⚠️ ANTHROPIC_API_KEY가 설정되어 있지 않습니다. .env 파일을 확인해 주세요."
+                stream_slot.markdown(
+                    _BUBBLE_BOT.format(content=html.escape(full_text)),
+                    unsafe_allow_html=True,
+                )
+            else:
+                try:
+                    client = anthropic.Anthropic(api_key=api_key)
+                    with client.messages.stream(
+                        model="claude-haiku-4-5-20251001",
+                        max_tokens=1000,
+                        system=QA_SYSTEM_PROMPT,
+                        messages=[{"role": "user", "content": question}],
+                    ) as stream:
+                        for text in stream.text_stream:
+                            full_text += text
+                            # 스트리밍 중: raw text + 커서
+                            stream_slot.markdown(
+                                _BUBBLE_BOT.format(content=html.escape(full_text) + " ▌"),
+                                unsafe_allow_html=True,
+                            )
+                    # 완료: 마크다운 렌더링 + 커서 제거
+                    stream_slot.markdown(
+                        _BUBBLE_BOT.format(content=_md_to_html(full_text)),
+                        unsafe_allow_html=True,
+                    )
+                except Exception as e:
+                    full_text = f"⚠️ 답변을 가져오는 중 문제가 발생했습니다: {e}"
+                    stream_slot.markdown(
+                        _BUBBLE_BOT.format(content=html.escape(full_text)),
+                        unsafe_allow_html=True,
+                    )
+
+            # 히스토리에 저장 후 rerun (패널 상단부터 깔끔하게 재렌더링)
+            st.session_state.qa_history.append({"q": question, "a": full_text})
             st.rerun()
 
 
