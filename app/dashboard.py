@@ -563,7 +563,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-tab_about, tab_a, tab_b = st.tabs(["📁 프로젝트 개요", "📊 Track A: Trust Score 임계값", "🕐 Track B: 혼잡도 패턴"])
+tab_about, tab_a, tab_b = st.tabs(["📁 프로젝트 개요", "📊 Trust Score 임계값", "🕐 Track B: 혼잡도 패턴"])
 
 # =========================================================
 # 트랙 A
@@ -826,7 +826,7 @@ with tab_about:
     <div class="section-card">
         <div class="section-title">데이터, 솔직하게 말씀드릴게요</div>
         <div class="section-desc">
-            이 대시보드의 모든 혼잡도 수치는 <b>합성(시뮬레이션) 데이터</b>를 기준으로 해요.
+            이 대시보드의 모든 혼잡도 수치는 <b>합성(시뮬레이션) 데이터</b>를 기준으로 해요.<br>
             서비스가 런칭되면 같은 파이프라인에 실데이터를 흘려보내서 정책을 다시 검증할
             예정이에요.<br><br>
             실제 서비스의 혼잡도는 LOW/MEDIUM/HIGH 3단계로 표현되는데, 이 시뮬레이션은
