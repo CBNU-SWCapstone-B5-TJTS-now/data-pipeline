@@ -559,11 +559,11 @@ st.markdown('<div class="eyebrow">NOWHERE DATA PIPELINE</div>', unsafe_allow_htm
 st.markdown('<div class="page-title">누구나 제보할 수 있는 실시간 혼잡도 앱, 거짓 제보는 어떻게 걸러낼까요?</div>', unsafe_allow_html=True)
 st.markdown(
     '<div class="page-subtitle">Nowhere는 사용자들이 서로의 제보를 검증하는 방식(Peer Review)으로 '
-    '신뢰도를 관리해요. 이 페이지는 그 검증 기준이 실제로 잘 작동하는지 데이터로 확인한 결과예요.</div>',
+    '신뢰도를 관리해요.<br>이 페이지는 그 검증 기준이 실제로 잘 작동하는지 데이터로 확인한 결과예요.</div>',
     unsafe_allow_html=True,
 )
 
-tab_about, tab_a, tab_b = st.tabs(["📁 프로젝트 개요", "📊 Trust Score 임계값", "🕐 혼잡도 패턴"])
+tab_about, tab_a, tab_b = st.tabs(["📁 프로젝트 개요", "📊 Track A: Trust Score 임계값", "🕐 Track B: 혼잡도 패턴"])
 
 # =========================================================
 # 트랙 A
@@ -585,7 +585,7 @@ with tab_a:
             if improve_pct is not None
             else "10회 반복 시뮬레이션 기준 가장 안정적으로 높은 상관계수를 기록했어요."
         )
-        hero_card_number("가장 신뢰도 높은 반대 임계값", str(best_th), "개", hero_desc)
+        hero_card_number("가장 신뢰도 높은 반대 개수", str(best_th), "개", hero_desc)
 
         col1, col2 = st.columns(2)
         with col1:
@@ -633,7 +633,7 @@ with tab_a:
                 st.dataframe(df_raw, use_container_width=True, hide_index=True)
 
         st.info(
-            "⚠️ 이 결과는 합성(시뮬레이션) 데이터를 기준으로 해요. "
+            "⚠️ 이 결과는 합성(시뮬레이션) 데이터를 기준으로 해요.\n"
             "서비스 런칭 후에는 실데이터로 다시 검증(재조정)할 예정이에요."
         )
     else:
