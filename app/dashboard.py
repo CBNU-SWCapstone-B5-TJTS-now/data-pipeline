@@ -834,12 +834,20 @@ with tab_about:
             Trust Score의 기본점수(50)와 동의 반영(+1) 규칙은 현재 배포된 코드가 아니라
             팀이 다음 단계로 검토 중인 확장 설계를 기준으로 시뮬레이션했어요.
         </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── 카드 6: 프로젝트 링크 (GitHub / Notion) ─────────────────────────
+    st.markdown(f"""
+    <div class="section-card">
+        <div class="section-title">프로젝트에 대해 더 자세히 알고 싶다면?</div>
+        <div class="section-desc">아래 링크를 클릭 하세요 </div>
         <div style="display:flex; gap:12px; margin-top:6px; flex-wrap:wrap;">
             <a href="https://github.com/CBNU-SWCapstone-B5-TJTS-now/data-pipeline" target="_blank"
                style="display:inline-block; padding:11px 22px; background:{P['blue']};
                       color:#FFFFFF; font-weight:700; font-size:14.5px; border-radius:12px;
                       text-decoration:none;">
-               GitHub Repository 방문하기</a>
+               GitHub Repository</a>
             <a href="https://app.notion.com/p/3984a969a1c78112b7e9f70995118766" target="_blank"
                style="display:inline-block; padding:11px 22px; background:{P['blue']};
                       color:#FFFFFF; font-weight:700; font-size:14.5px; border-radius:12px;
