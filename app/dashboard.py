@@ -216,16 +216,31 @@ div[data-testid="stAlert"] svg {{ color: {P['info_text']} !important; fill: {P['
     box-shadow: 0 4px 14px rgba(0,0,0,0.15); font-size: 21px;
 }}
 
-/* 플로팅 채팅 미니 팝업 카드: 두 버튼 위쪽, 다크 톤 카드 */
+/* 플로팅 채팅 패널: 흰 배경 + 회색 말풍선 채팅 버블 */
 .st-key-chat_popup_container {{
-    position: fixed !important; bottom: 156px; right: 28px; z-index: 9998;
-    width: 360px; max-height: 60vh; overflow-y: auto;
-    background: {P['card']} !important; border: 1px solid {P['border']} !important;
-    border-radius: 18px !important; box-shadow: 0 16px 40px rgba(0,0,0,0.35) !important;
-    padding: 20px !important;
+    position: fixed !important; bottom: 152px; right: 28px; z-index: 9998;
+    width: 380px; background: #FFFFFF !important;
+    border: 1px solid #E5E8EB !important; border-radius: 20px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.16) !important;
+    overflow: hidden !important; padding: 0 !important;
 }}
 @media (max-width: 480px) {{
-    .st-key-chat_popup_container {{ width: calc(100vw - 40px); right: 20px; }}
+    .st-key-chat_popup_container {{ width: calc(100vw - 40px); right: 20px; bottom: 148px; }}
+}}
+/* 닫기(✕) 버튼: 소형 투명 버튼 */
+.st-key-chat_close_btn button {{
+    background: transparent !important; border: none !important;
+    color: #8B95A1 !important; font-size: 14px !important;
+    padding: 4px 8px !important; border-radius: 6px !important;
+    min-height: unset !important; height: 32px !important;
+}}
+.st-key-chat_close_btn button:hover {{ background: #F2F4F6 !important; color: #191F28 !important; }}
+/* 채팅 입력창: 패널 하단에 구분선 + 둥근 모서리 */
+.st-key-chat_popup_container [data-testid="stChatInput"] {{
+    border-top: 1px solid #E5E8EB !important;
+    border-radius: 0 0 20px 20px !important;
+    background: #FAFAFA !important;
+    padding: 6px 14px 10px !important;
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -241,6 +256,8 @@ def toggle_chat():
 
 if "chat_open" not in st.session_state:
     st.session_state.chat_open = False
+if "qa_history" not in st.session_state:
+    st.session_state.qa_history = []
 
 
 def fig_to_base64(fig) -> str:
@@ -372,30 +389,30 @@ GitHub: https://github.com/CBNU-SWCapstone-B5-TJTS-now/data-pipeline
 """
 
 
-def ask_claude(question: str):
-    """Claude Haiku에 질문을 보내고 session_state에 답변/에러를 저장"""
-    st.session_state["qa_answer"] = None
-    st.session_state["qa_error"] = None
+def ask_claude_and_save(question: str):
+    """Claude Haiku에 질문하고 결과를 qa_history 리스트에 추가"""
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
-        st.session_state["qa_error"] = "ANTHROPIC_API_KEY가 설정되어 있지 않아요. .env 파일을 확인해주세요."
+        st.session_state.qa_history.append({
+            "q": question,
+            "a": "⚠️ ANTHROPIC_API_KEY가 설정되어 있지 않아요. .env 파일을 확인해주세요.",
+        })
         return
     try:
-        with st.spinner("답변을 생각하고 있어요..."):
-            client = anthropic.Anthropic(api_key=api_key)
-            resp = client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=300,
-                system=QA_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": question}],
-            )
-            st.session_state["qa_answer"] = resp.content[0].text
+        client = anthropic.Anthropic(api_key=api_key)
+        resp = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=300,
+            system=QA_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": question}],
+        )
+        st.session_state.qa_history.append({"q": question, "a": resp.content[0].text})
     except Exception as e:
-        st.session_state["qa_error"] = f"답변을 가져오는 중 문제가 생겼어요: {e}"
+        st.session_state.qa_history.append({"q": question, "a": f"⚠️ 답변을 가져오는 중 문제가 생겼어요: {e}"})
 
 
 def render_floating_chat():
-    """화면 우측 하단 상시 고정 채팅 토글 버튼 + 클릭 시 열리는 미니 팝업 카드.
+    """화면 우측 하단 상시 고정 채팅 버블.
     with tab_x: 블록 밖(페이지 전역)에서 호출해야 탭을 바꿔도 계속 보인다."""
     st.button("💬", on_click=toggle_chat, help="이 프로젝트에 대해 물어보기", key="chat_toggle_btn")
 
@@ -403,39 +420,63 @@ def render_floating_chat():
         return
 
     with st.container(key="chat_popup_container"):
-        st.markdown(f"""
-        <div style="font-weight:700; font-size:15.5px; color:{P['text1']}; margin-bottom:4px;">
-            💬 이 프로젝트에 대해 물어보세요
-        </div>
-        <div style="font-size:12.5px; color:{P['text3']}; margin-bottom:14px; line-height:1.5;">
-            Claude(Anthropic)가 이 대시보드 내용을 바탕으로 답변해드려요.
-        </div>
-        """, unsafe_allow_html=True)
-
-        question = st.text_input(
-            "질문", key="qa_question", label_visibility="collapsed",
-            placeholder="예: 트랙 A 결과가 무슨 의미인가요?",
-        )
-        ask = st.button("물어보기", use_container_width=True, key="qa_ask_btn")
-
-        if ask and question.strip():
-            ask_claude(question)
-
-        if st.session_state.get("qa_error"):
-            st.markdown(f"""
-            <div style="margin-top:12px; padding-top:12px; border-top:1px solid {P['border']};
-                        font-size:13.5px; color:{P['text2']}; line-height:1.6;">
-                ⚠️ {html.escape(st.session_state["qa_error"])}
+        # ── 헤더: 제목 + 닫기(✕) 버튼 ───────────────────────────────
+        col_title, col_close = st.columns([6, 1])
+        with col_title:
+            st.markdown("""
+            <div style="padding:16px 4px 6px 20px;">
+                <div style="font-size:15px; font-weight:700; color:#191F28; line-height:1.4;">
+                    💬 이 프로젝트에 대해 물어보세요
+                </div>
+                <div style="font-size:12px; color:#8B95A1; margin-top:3px;">
+                    Claude(Anthropic)가 이 대시보드 내용을 바탕으로 답변해드려요.
+                </div>
             </div>
             """, unsafe_allow_html=True)
-        elif st.session_state.get("qa_answer"):
-            answer_html = html.escape(st.session_state["qa_answer"]).replace("\n", "<br>")
-            st.markdown(f"""
-            <div style="margin-top:12px; padding-top:12px; border-top:1px solid {P['border']};
-                        font-size:13.5px; color:{P['text2']}; line-height:1.7;">
-                {answer_html}
-            </div>
-            """, unsafe_allow_html=True)
+        with col_close:
+            st.button("✕", on_click=toggle_chat, key="chat_close_btn")
+
+        # ── 히스토리 또는 힌트 텍스트 ────────────────────────────────
+        if st.session_state.qa_history:
+            history_parts = []
+            for item in st.session_state.qa_history:
+                q_esc = html.escape(item["q"])
+                a_html = html.escape(item["a"]).replace("\n", "<br>")
+                history_parts.append(f"""
+                <div style="background:#E5E8EB; border-radius:12px 12px 12px 3px;
+                            padding:10px 14px; margin-bottom:6px;
+                            font-size:13.5px; color:#191F28; line-height:1.6;">
+                    {q_esc}
+                </div>
+                <div style="background:#F8F9FA; border:1px solid #E5E8EB;
+                            border-radius:3px 12px 12px 12px;
+                            padding:10px 14px; margin-bottom:12px;
+                            font-size:13.5px; color:#4E5968; line-height:1.7;">
+                    {a_html}
+                </div>
+                """)
+            st.markdown(
+                '<div style="max-height:220px; overflow-y:auto; padding:4px 20px 4px;">'
+                + "".join(history_parts)
+                + "</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div style="padding:4px 20px 8px; font-size:12.5px; color:#8B95A1; line-height:1.7;">'
+                "예시 질문:<br>"
+                "· 트랙 A 결과가 무슨 의미인가요?<br>"
+                "· 이 데이터는 실제 데이터인가요?<br>"
+                "· 어떤 기술 스택을 사용했나요?"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+        # ── 입력창 (st.chat_input — 컨테이너 안에 정상 렌더링 확인됨) ──
+        if question := st.chat_input("질문을 입력하세요...", key="chat_main_input"):
+            with st.spinner("생각하고 있어요..."):
+                ask_claude_and_save(question)
+            st.rerun()
 
 
 # =========================================================
