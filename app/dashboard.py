@@ -260,6 +260,8 @@ if "chat_open" not in st.session_state:
     st.session_state.chat_open = False
 if "qa_history" not in st.session_state:
     st.session_state.qa_history = []
+if "_pending_q" not in st.session_state:
+    st.session_state._pending_q = None
 
 
 def fig_to_base64(fig) -> str:
@@ -336,7 +338,14 @@ def style_axes(ax):
 QA_SYSTEM_PROMPT = """당신은 "Nowhere Data Pipeline" 대시보드에 내장된 안내 도우미입니다.
 이 프로젝트를 처음 접하는 평가자, 교수님, 발표 관람자의 질문에
 아래에 제공된 사실만을 근거로, '-입니다'체를 사용하여 답변하십시오.
-발표자가 청중에게 차분하게 설명하는 톤으로, 3~5문장으로 간결하고 명료하게 답변하십시오.
+발표자가 청중에게 차분하게 설명하는 톤으로, 3~5문장 이내로 간결하고 명료하게 답변하십시오.
+
+[반드시 지켜야 할 형식 규칙]
+- 마크다운 헤딩(#, ##, ###)은 절대 사용하지 마십시오.
+- 번호 매기기나 불릿 목록도 최대한 자제하고 자연스러운 서술형 문단으로 작성하십시오.
+- 짧고 핵심만 담은 답변이 길고 구조화된 답변보다 낫습니다.
+- 인사말("안녕하세요" 등)로 시작하지 말고 바로 질문에 답변하십시오.
+
 아래에 명시되지 않은 내용은 추측하지 말고
 "이 부분은 정확한 내용을 파악하기 어렵습니다. README나 보고서를 참고해 주십시오."라고 말씀드리십시오.
 
@@ -409,7 +418,7 @@ def _md_to_html(text: str) -> str:
         r'<code style="background:#F2F4F6;padding:1px 5px;border-radius:4px;font-size:12px">\1</code>',
         text,
     )
-    text = text.replace("\n\n", '<br><br>').replace("\n", '<br>')
+    text = text.replace("\n\n", '<br>').replace("\n", '<br>')
     return text
 
 
@@ -423,7 +432,7 @@ _BUBBLE_USER = (
 _BUBBLE_BOT = (
     '<div style="display:flex;justify-content:flex-start;padding:3px 16px 3px;">'
     '<div style="background:#F2F4F6;border:1px solid #E5E8EB;border-radius:4px 18px 18px 18px;'
-    'padding:10px 14px;max-width:78%;font-size:13.5px;color:#4E5968;line-height:1.7;">'
+    'padding:10px 14px;max-width:78%;font-size:13.5px;color:#4E5968;line-height:1.5;">'
     '{content}</div></div>'
 )
 
@@ -453,8 +462,8 @@ def render_floating_chat():
         with col_close:
             st.button("✕", on_click=toggle_chat, key="chat_close_btn")
 
-        # ── 대화 이력 (카카오톡 스타일 말풍선) ──────────────────────
-        if not st.session_state.qa_history:
+        # ── 대화 이력 (카카오톡 스타일 말풍선, flex-column-reverse로 최신글 항상 하단 표시) ──
+        if not st.session_state.qa_history and not st.session_state._pending_q:
             st.markdown(
                 '<div style="padding:6px 20px 8px;font-size:12.5px;color:#8B95A1;line-height:1.8;">'
                 "예시 질문:<br>"
@@ -465,26 +474,32 @@ def render_floating_chat():
                 unsafe_allow_html=True,
             )
 
+        # flex-direction:column-reverse 로 최신 메시지가 항상 하단에 보이게 함
+        # Python 이터레이션을 reversed()로 뒤집어야 시각적 순서(위=오래된, 아래=최신)가 맞음
         history_html = "".join(
             _BUBBLE_USER.format(content=html.escape(item["q"]))
             + _BUBBLE_BOT.format(content=_md_to_html(item["a"]))
-            for item in st.session_state.qa_history
+            for item in reversed(st.session_state.qa_history)
         )
         if history_html:
             st.markdown(
-                f'<div style="max-height:450px;overflow-y:auto;padding:4px 0;">{history_html}</div>',
+                '<div style="max-height:420px;overflow-y:auto;padding:4px 0;'
+                'display:flex;flex-direction:column-reverse;">'
+                f'{history_html}</div>',
                 unsafe_allow_html=True,
             )
 
-        # ── 입력 + 스트리밍 응답 ─────────────────────────────────────
-        if question := st.chat_input("질문을 입력하세요...", key="chat_main_input"):
-            # 사용자 말풍선 즉시 표시
+        # ── 대기 중인 질문 처리 (입력창 위 위치에서 스트리밍) ──────────
+        # st.chat_input() 보다 먼저 렌더링되어야 스트리밍이 입력창 아래로 튀지 않음
+        if st.session_state._pending_q:
+            pending_q = st.session_state._pending_q
+            st.session_state._pending_q = None  # 중복 실행 방지
+
             st.markdown(
-                _BUBBLE_USER.format(content=html.escape(question)),
+                _BUBBLE_USER.format(content=html.escape(pending_q)),
                 unsafe_allow_html=True,
             )
 
-            # 스트리밍 응답 말풍선 (st.empty로 실시간 업데이트)
             stream_slot = st.empty()
             full_text = ""
             api_key = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -502,16 +517,14 @@ def render_floating_chat():
                         model="claude-haiku-4-5-20251001",
                         max_tokens=1000,
                         system=QA_SYSTEM_PROMPT,
-                        messages=[{"role": "user", "content": question}],
+                        messages=[{"role": "user", "content": pending_q}],
                     ) as stream:
-                        for text in stream.text_stream:
-                            full_text += text
-                            # 스트리밍 중: raw text + 커서
+                        for chunk in stream.text_stream:
+                            full_text += chunk
                             stream_slot.markdown(
                                 _BUBBLE_BOT.format(content=html.escape(full_text) + " ▌"),
                                 unsafe_allow_html=True,
                             )
-                    # 완료: 마크다운 렌더링 + 커서 제거
                     stream_slot.markdown(
                         _BUBBLE_BOT.format(content=_md_to_html(full_text)),
                         unsafe_allow_html=True,
@@ -523,8 +536,12 @@ def render_floating_chat():
                         unsafe_allow_html=True,
                     )
 
-            # 히스토리에 저장 후 rerun (패널 상단부터 깔끔하게 재렌더링)
-            st.session_state.qa_history.append({"q": question, "a": full_text})
+            st.session_state.qa_history.append({"q": pending_q, "a": full_text})
+            st.rerun()
+
+        # ── 입력창 ────────────────────────────────────────────────────
+        if question := st.chat_input("질문을 입력하세요...", key="chat_main_input"):
+            st.session_state._pending_q = question
             st.rerun()
 
 
