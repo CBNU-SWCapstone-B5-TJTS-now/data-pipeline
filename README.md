@@ -13,6 +13,13 @@ Nowhere는 Geofence로 현장 인증된 유저들의 동의/반대 투표를 바
 - **트랙 A — Trust Score 임계값 최적화**: 시뮬레이션 데이터로 여러 임계값을 실험하여, 어떤 값이 "실제로 정확한 제보자"와 "부정확한/어뷰징 제보자"를 가장 잘 구별하는지 검증
 - **트랙 B — 시공간 혼잡도 패턴 분석**: 장소×시간대별 혼잡도 패턴을 분석하고, 기상청 공공데이터(날씨)를 결합하여 향후 B2G(학교 행정실 대상) 리포트 제공 기반을 마련
 
+## Nowhere 앱 실제 데모 화면
+
+| 혼잡도 지도 | 장소 상세 | Peer Review |
+|:---:|:---:|:---:|
+| ![혼잡도 지도](docs/screenshots/congestion1.jpg) | ![장소 상세](docs/screenshots/congestion_detail.jpg) | ![Peer Review](docs/screenshots/peer_review.png) |
+| 캠퍼스 내 거점별 혼잡도가 지도에 실시간 표시됩니다 | 장소를 탭하면 현재 혼잡 상태와 동의 수, 최근 제보 이력을 확인합니다 | 근처 사용자가 제보를 검증(동의/비동의)하여 Trust Score에 반영합니다 |
+
 ## 실행 화면
 
 배포 URL: `http://217.142.139.165` (OCI vm-03, nginx → Streamlit 리버스 프록시)
