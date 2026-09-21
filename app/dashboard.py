@@ -387,10 +387,10 @@ Nowhere는 CBNU SW캡스톤 졸업 프로젝트로 만든 Geofencing 기반 실�
   데이터가 합성(시뮬레이션)이라 날씨와의 실질적 상관관계 분석은 아직 하지 않음
 
 ## 인프라
-OCI vm-03(Oracle Linux 8, 2 OCPU/16GB) 위에 PostgreSQL 16 + PostGIS로 데이터를
+AWS EC2(Amazon Linux 2023) 위에 PostgreSQL 16 + PostGIS로 데이터를
 저장하고, Python으로 시뮬레이션 데이터를 생성·분석했다. Streamlit으로 대시보드를
-만들고 nginx 리버스 프록시로 외부에 공개했다. Object Storage에 원본 데이터를
-백업한다.
+만들고 nginx 리버스 프록시로 외부에 공개했다. S3에 원본 데이터를
+백업한다. (기존에는 OCI vm-03 위에서 운영했으나 AWS로 이전함)
 
 ## 데이터에 대한 중요한 한계
 모든 수치는 합성(시뮬레이션) 데이터 기준이며 실사용자 데이터가 아니다. 서비스
@@ -811,10 +811,10 @@ with tab_about:
     <div class="section-card">
         <div class="section-title">어떻게 만들었나요</div>
         <div class="section-desc">
-            OCI 가상서버(vm-03) 위에 PostgreSQL+PostGIS로 데이터를 저장하고, Python으로
+            AWS EC2 가상서버 위에 PostgreSQL+PostGIS로 데이터를 저장하고, Python으로
             시뮬레이션 데이터를 만들어서 분석했어요. 기상청 공공데이터도 매시간 자동으로
             모으고 있고요. 이 페이지는 nginx를 통해 외부에 공개돼 있어요. 전체 구조는 아래
-            그림에서 확인할 수 있어요.
+            그림에서 확인할 수 있어요. (기존에는 OCI 위에서 운영하다가 AWS로 이전했어요)
         </div>
         {diagram_html}
     </div>
@@ -877,7 +877,7 @@ st.markdown(f"""
             <div style="font-size:13.5px; font-weight:700; color:{P['text1']}; margin-bottom:12px; letter-spacing:0.3px;">🛠️ 기술 스택</div>
             <div style="color:{P['text2']}; font-size:14.5px; line-height:2;">
                 수집·처리 — Python, pandas, requests<br>
-                저장 — PostgreSQL 16 + PostGIS, OCI Block Volume, Object Storage<br>
+                저장 — PostgreSQL 16 + PostGIS, AWS EBS, AWS S3<br>
                 시각화 — Streamlit, matplotlib, folium
             </div>
         </div>

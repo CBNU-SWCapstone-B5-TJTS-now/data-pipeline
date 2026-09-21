@@ -61,20 +61,22 @@ Nowhere는 근처의 다른 사용자들이 제보를 검증하는 **Peer Review
 
 시뮬레이션 데이터 생성      PostgreSQL 16 + PostGIS    트랙 A: 임계값별          Streamlit 대시보드
 (가상 User/Report/Vote)    (crowd_pipeline DB)         Trust Score 상관분석     (차트 + 히트맵 + 지도)
-        +                  Block Volume                      +                        +
+        +                  EBS 볼륨                          +                        +
 기상청 공공데이터 API        (로컬 CSV/로그)             트랙 B: PostGIS           nginx 리버스 프록시
-(초단기실황, cron 매시간)   Object Storage               공간쿼리 + 날씨 결합      (80 → 8501)
+(초단기실황, cron 매시간)   S3                          공간쿼리 + 날씨 결합      (80 → 8501)
                            (원본 데이터/결과 백업)
 ```
 
-**사용 OCI 리소스**
+**사용 AWS 리소스** (기존 OCI 구성에서 이전)
 
 | 리소스 | 사양 | 역할 |
 |---|---|---|
-| Compute VM (vm-03) | Oracle Linux 8, 2 OCPU/16GB | PostgreSQL, Streamlit, cron, nginx 전부 구동 |
-| Block Volume | 로컬 블록 스토리지 | DB 데이터 디렉토리, 스크립트·로그 저장 |
-| Object Storage | nowhere-pipeline-data 버킷 | 원본 데이터·분석 결과 백업 |
-| VCN / Security List | 인바운드 규칙 | PostgreSQL(5432), 웹(80) 포트만 허용 |
+| EC2 인스턴스 | Amazon Linux 2023 | PostgreSQL, Streamlit, cron, nginx 전부 구동 |
+| EBS 볼륨 | 인스턴스 연결 블록 스토리지 | DB 데이터 디렉토리, 스크립트·로그 저장 |
+| S3 | nowhere-pipeline-data 버킷 | 원본 데이터·분석 결과 백업 |
+| 보안 그룹 | 인바운드 규칙 | PostgreSQL(5432), 웹(80) 포트만 허용 |
+
+> 기존에는 OCI Compute VM(vm-03, Oracle Linux 8) + Block Volume + Object Storage로 구성되어 있었으며, AWS로 이전하면서 각각 EC2 + EBS + S3로 전환했습니다.
 
 전체 워크플로우 다이어그램:
 ![워크플로우 다이어그램](docs/workflow_diagram.png)
@@ -84,10 +86,11 @@ Nowhere는 근처의 다른 사용자들이 제보를 검증하는 **Peer Review
 ## 설치 및 실행 방법
 
 ### 사전 요구사항
-- OCI VM Instance (Oracle Linux 8 이상)
+- AWS EC2 인스턴스 (Amazon Linux 2023 이상)
 - conda 환경 (Python 3.11)
 - PostgreSQL 16 + PostGIS 3.3 (`scripts/setup_postgis.md` 참고)
 - 기상청 공공데이터포털(data.go.kr) API 인증키
+- S3 백업용 AWS 자격증명 (IAM 역할 또는 액세스 키, `.env.example` 참고)
 - 한글 폰트: `sudo dnf install -y google-noto-sans-cjk-ttc-fonts`
 
 ### 설치 및 실행
@@ -117,7 +120,7 @@ streamlit run app/dashboard.py --server.port 8501
 
 ### cron 자동화 (날씨 데이터 매시간 수집)
 ```bash
-0 * * * * cd /home/opc/data-pipeline && /home/opc/miniconda3/envs/bigdata/bin/python scripts/fetch_weather.py >> logs/weather.log 2>&1
+0 * * * * cd /home/ec2-user/data-pipeline && /home/ec2-user/miniconda3/envs/bigdata/bin/python scripts/fetch_weather.py >> logs/weather.log 2>&1
 ```
 
 ---
@@ -157,7 +160,7 @@ streamlit run app/dashboard.py --server.port 8501
 
 ## 이식성 — Docker Compose 설계
 
-향후 실사용자 환경 이전을 대비해 컨테이너화 설계를 마련했습니다. (설계 수준, `docker compose up` 검증 미수행)
+OCI에서 AWS EC2로 이전하기 위해 컨테이너화 설계를 마련했습니다. (설계 수준, `docker compose up` 검증 미수행)
 
 | 서비스 | 이미지 | 역할 |
 |---|---|---|
@@ -174,7 +177,7 @@ streamlit run app/dashboard.py --server.port 8501
 - **혼잡도 표현 단순화**: 실제 서비스는 LOW/MEDIUM/HIGH 3단계이나, 분석 편의상 순서형 점수로 근사
 - **가중치 알고리즘 미구현**: "고신뢰 유저 제보에 더 큰 영향력" 알고리즘은 이번 범위를 벗어나 근거 제시까지만 다룸
 - **공간별 차등 임계값**: 현재는 전역 단일 임계값 검증. 향후 장소 카테고리별 차등 적용 방안 검토 예정
-- **크로스클라우드 설계**: 실서비스(AWS) - 파이프라인(OCI) 분리 시, 주기적 스냅샷 기반 분석 구조로 전환 예정
+- **크로스클라우드 설계**: 파이프라인을 OCI에서 AWS로 이전하며 실서비스와 동일 클라우드로 통합. 향후 계정/네트워크 분리가 필요해지면 주기적 스냅샷 기반 분석 구조로 전환 예정
 
 ---
 
