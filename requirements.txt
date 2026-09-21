@@ -11,3 +11,4 @@ requests
 python-dotenv
 matplotlib
 anthropic
+boto3

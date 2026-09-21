@@ -1,14 +1,16 @@
 """
-vm-03 실행용: 시뮬레이션 데이터 및 분석 결과를 OCI Object Storage에 백업
+EC2 실행용: 시뮬레이션 데이터 및 분석 결과를 AWS S3에 백업
 
 사전 준비:
-1. OCI CLI 설정 완료 (oci setup config), 또는 vm-03이 Instance Principal로 인증 가능해야 함
+1. EC2 인스턴스에 S3 접근 권한이 있는 IAM 역할(Instance Profile)을 연결하거나,
+   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY 환경변수를 설정해야 함
 2. 버킷이 없으면 먼저 생성:
-   oci os bucket create --compartment-id <compartment-ocid> --name nowhere-pipeline-data
+   aws s3 mb s3://nowhere-pipeline-data --region ap-northeast-2
 """
 import os
-import subprocess
 import pandas as pd
+import boto3
+from botocore.exceptions import ClientError
 from sqlalchemy import create_engine
 
 DB_USER = "crowd_app"
@@ -17,8 +19,9 @@ DB_HOST = "localhost"
 DB_PORT = 5432
 DB_NAME = "crowd_pipeline"
 
-BUCKET_NAME = "nowhere-pipeline-data"
-EXPORT_DIR = "/home/opc/nowhere-pipeline/exports"
+BUCKET_NAME = os.environ.get("AWS_S3_BUCKET", "nowhere-pipeline-data")
+AWS_REGION = os.environ.get("AWS_REGION", "ap-northeast-2")
+EXPORT_DIR = "/home/ec2-user/nowhere-pipeline/exports"
 
 TABLES_TO_EXPORT = [
     "sim_users", "sim_locations", "sim_reports", "sim_votes",
@@ -43,21 +46,15 @@ def export_tables_to_csv(engine):
     return exported
 
 
-def upload_to_object_storage(file_paths):
+def upload_to_s3(file_paths):
+    s3 = boto3.client("s3", region_name=AWS_REGION)
     for path in file_paths:
         object_name = os.path.basename(path)
-        cmd = [
-            "oci", "os", "object", "put",
-            "--bucket-name", BUCKET_NAME,
-            "--file", path,
-            "--name", object_name,
-            "--force",
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode == 0:
+        try:
+            s3.upload_file(path, BUCKET_NAME, object_name)
             print(f"  업로드 완료: {object_name}")
-        else:
-            print(f"  업로드 실패: {object_name}\n{result.stderr}")
+        except ClientError as e:
+            print(f"  업로드 실패: {object_name}\n{e}")
 
 
 def main():
@@ -66,8 +63,8 @@ def main():
     print("=== 1. DB 테이블 CSV export ===")
     exported_files = export_tables_to_csv(engine)
 
-    print(f"\n=== 2. Object Storage 버킷({BUCKET_NAME})에 업로드 ===")
-    upload_to_object_storage(exported_files)
+    print(f"\n=== 2. S3 버킷({BUCKET_NAME})에 업로드 ===")
+    upload_to_s3(exported_files)
 
     print("\n완료.")
 

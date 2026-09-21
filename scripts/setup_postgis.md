@@ -1,9 +1,9 @@
-# vm-03 (Oracle Linux 8) - PostgreSQL + PostGIS 설치
+# EC2 (Amazon Linux 2023) - PostgreSQL + PostGIS 설치
 
-## 1. PostgreSQL 공식 repo 등록 (OL8은 기본 repo 버전이 낮아서 PGDG repo 권장)
+## 1. PostgreSQL 공식 repo 등록 (AL2023은 기본 repo 버전이 낮아서 PGDG repo 권장)
 
 ```bash
-sudo dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+sudo dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm
 
 # 기본 모듈(appstream)의 postgresql이 충돌하므로 비활성화
 sudo dnf -qy module disable postgresql
@@ -49,16 +49,17 @@ host    all             all             0.0.0.0/0               scram-sha-256
 sudo systemctl restart postgresql-16
 ```
 
-## 5. 방화벽 설정 (MySQL 때와 동일한 2단계 - firewalld + OCI Security List)
+## 5. 방화벽 설정 (OS 레벨 firewalld + AWS 보안 그룹 2단계)
 
 ```bash
-# firewalld (OS 레벨)
+# firewalld (OS 레벨, AL2023은 기본 비활성화인 경우가 많음 - 필요 시에만)
 sudo firewall-cmd --permanent --add-port=5432/tcp
 sudo firewall-cmd --reload
 sudo firewall-cmd --list-ports
 ```
 
-OCI 콘솔에서 Security List에 Ingress Rule 추가 (포트 5432, MySQL 3306 설정했던 것과 같은 방식)
+AWS 콘솔(EC2 > 보안 그룹)에서 인바운드 규칙에 PostgreSQL(5432) 포트 추가
+(소스는 필요한 IP 대역으로 제한 권장, 웹(80/443) 포트도 별도로 허용)
 
 ## 6. DB 및 PostGIS extension 생성
 
