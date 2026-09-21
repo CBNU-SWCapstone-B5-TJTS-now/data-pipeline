@@ -170,7 +170,7 @@ OCI에서 AWS EC2로 이전하기 위해 컨테이너화 설계를 마련했습�
 
 | 서비스 | 이미지 | 역할 |
 |---|---|---|
-| `postgres` | `postgis/postgis:16-3.3` | DB (호스트 5432와 충돌 방지 위해 5433 매핑) |
+| `postgres` | `postgis/postgis:16-3.5` | DB (호스트 5432와 충돌 방지 위해 5433 매핑) |
 | `streamlit` | `app/Dockerfile` | 대시보드 |
 | `cron` | `scripts/Dockerfile.cron` | 날씨 API 매시간 자동 수집 |
 | `nginx` | `nginx:1.25-alpine` | 80 → streamlit 리버스 프록시 |
