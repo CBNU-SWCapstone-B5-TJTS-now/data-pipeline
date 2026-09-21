@@ -78,6 +78,8 @@ Nowhere는 근처의 다른 사용자들이 제보를 검증하는 **Peer Review
 
 > 기존에는 OCI Compute VM(vm-03, Oracle Linux 8) + Block Volume + Object Storage로 구성되어 있었으며, AWS로 이전하면서 각각 EC2 + EBS + S3로 전환했습니다.
 
+> **인스턴스 분리**: Nowhere 백엔드([backend](https://github.com/CBNU-SWCapstone-B5-TJTS-now/backend), Spring Boot)는 이미 별도 AWS EC2(t3.micro, RAM 1GB+스왑 2GB)에 nginx·Let's Encrypt로 배포되어 있으며, 메모리 여유가 거의 없어 다른 서비스를 함께 띄울 수 없습니다. 따라서 이 데이터 파이프라인은 백엔드와 **별도의 EC2 인스턴스**로 분리 배포합니다.
+
 전체 워크플로우 다이어그램:
 ![워크플로우 다이어그램](docs/workflow_diagram.png)
 
