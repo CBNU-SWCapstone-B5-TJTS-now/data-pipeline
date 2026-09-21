@@ -15,8 +15,8 @@ from sqlalchemy import create_engine, text
 
 DB_USER = "crowd_app"
 DB_PASSWORD = os.environ.get("CROWD_APP_PW", "")
-DB_HOST = "localhost"
-DB_PORT = 5432
+DB_HOST = os.environ.get("DB_HOST", "localhost")
+DB_PORT = int(os.environ.get("DB_PORT", "5432"))
 DB_NAME = "crowd_pipeline"
 
 engine = create_engine(f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}")
