@@ -1,6 +1,5 @@
 # Nowhere Data Pipeline - Streamlit 대시보드 컨테이너
-# 설계 수준 초안 (실사용 마이그레이션 전 이식성 검증용, 미실행 검증)
-# Oracle Linux 8 + SELinux 호스트 환경을 염두에 두고 작성됨
+# 설계 수준 초안 (AWS EC2 이전용, 미실행 검증)
 
 FROM python:3.11-slim
 

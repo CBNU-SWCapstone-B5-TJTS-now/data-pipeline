@@ -1,7 +1,8 @@
 # Nowhere Data Pipeline - 기상청 공공데이터 수집 cron 컨테이너
-# 설계 수준 초안 (실사용 마이그레이션 전 이식성 검증용, 미실행 검증)
-# vm-03에서는 시스템 crontab(매시 정각)으로 fetch_weather.py를 실행했는데,
+# 설계 수준 초안 (AWS EC2 이전용, 미실행 검증)
+# 기존 OCI vm-03에서는 시스템 crontab(매시 정각)으로 fetch_weather.py를 실행했는데,
 # 컨테이너 환경에서는 별도 cron 데몬을 컨테이너 안에 포함시키는 방식으로 대체.
+# vm-03의 시스템 crontab과 동일한 스케줄(매시 정각)을 유지.
 
 FROM python:3.11-slim
 
