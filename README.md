@@ -87,8 +87,12 @@ Nowhere는 근처의 다른 사용자들이 제보를 검증하는 **Peer Review
 
 ## 설치 및 실행 방법
 
+### AWS 인프라 준비 (Terraform)
+EC2/S3/IAM 역할/보안 그룹/Elastic IP를 콘솔에서 수동으로 만드는 대신, `terraform/` 디렉토리의
+코드로 생성할 수 있습니다. 사용법은 [`terraform/README.md`](terraform/README.md) 참고.
+
 ### 사전 요구사항
-- AWS EC2 인스턴스 (Amazon Linux 2023 이상)
+- AWS EC2 인스턴스 (Amazon Linux 2023 이상, 위 Terraform으로 생성했다면 자동 준비됨)
 - conda 환경 (Python 3.11)
 - PostgreSQL 16 + PostGIS 3.3 (`scripts/setup_postgis.md` 참고)
 - 기상청 공공데이터포털(data.go.kr) API 인증키
