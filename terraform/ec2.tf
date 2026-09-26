@@ -29,6 +29,14 @@ resource "aws_instance" "pipeline" {
     Name    = "${var.project_name}-ec2"
     Project = var.project_name
   }
+
+  lifecycle {
+    # AMI는 최초 생성 시점 기준으로 고정한다. most_recent = true인 data source를
+    # 그대로 두면, 이후 AWS가 새 AL2023 AMI를 배포했을 때 보안 그룹 등 무관한
+    # 변경만으로도 apply할 때 인스턴스 전체가 교체(destroy + create)되어
+    # 인스턴스에 설치한 모든 것이 날아가는 사고로 이어진다.
+    ignore_changes = [ami]
+  }
 }
 
 resource "aws_eip" "pipeline" {

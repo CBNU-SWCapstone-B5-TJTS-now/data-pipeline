@@ -17,9 +17,9 @@ variable "instance_type" {
 }
 
 variable "root_volume_size_gb" {
-  description = "루트 EBS 볼륨 크기(GB)"
+  description = "루트 EBS 볼륨 크기(GB). AL2023 AMI가 요구하는 최소 스냅샷 크기가 배포마다 늘어날 수 있어 여유를 두고 30 이상 권장"
   type        = number
-  default     = 20
+  default     = 30
 }
 
 variable "key_pair_name" {
